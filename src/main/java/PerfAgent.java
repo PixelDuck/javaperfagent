@@ -1,12 +1,13 @@
+import static java.lang.String.format;
+
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -26,95 +27,10 @@ public class PerfAgent implements ClassFileTransformer {
 
   private Map<String,Set<String>> trackedClass = new HashMap<>();
   private Map<String,Set<String>> untrackedClass = new HashMap<>();
+  private Set<String> debugClasses = new HashSet<>();
 
   public PerfAgent(String ... args) {
     config(args[0]);
-    if(args.length > 1)
-      PerfAgentHelper.outputFile(args[1]);
-  }
-
-  public static class PerfAgentHelper {
-
-    private static String outputFile = "/tmp/stats.json";
-
-    public static ThreadLocal<ArrayList<Object[]>> monitorsTL = new ThreadLocal<ArrayList<Object[]>>() {
-      @Override protected ArrayList<Object[]> initialValue() {
-        return new ArrayList<>();
-      }
-    };
-    public static ThreadLocal<Integer> deepTL = new ThreadLocal<Integer>() {
-      @Override protected Integer initialValue() {
-        return 0;
-      }
-    };
-
-    public static int beforeMethod(String methodName) {
-      int iDeep = incrDeep();
-      int monitorsIndex = monitorsTL.get().size();
-      monitorsTL.get().add(new Object[] { methodName, iDeep, System.currentTimeMillis() });
-      return monitorsIndex;
-    }
-
-    public static void afterMethod(int monitorsIndex) {
-      java.lang.Object[] ar = monitorsTL.get().get(monitorsIndex);
-      ar[2] = System.currentTimeMillis() - (Long) ar[2];
-      if (deepTL.get() == 1) {
-        ArrayList<Object[]> objects = monitorsTL.get();
-        StringBuilder monitorsSb = new StringBuilder();
-        monitorsSb.append("[{");
-        for (int i1 = 0; i1 < objects.size(); i1++) {
-          Object[] monitor = objects.get(i1);
-          Object[] nextMonitor = (i1 < objects.size() - 1) ? objects.get(i1 + 1) : null;
-          int currentDeep = (Integer) monitor[1];
-          int nextElementDeep = nextMonitor != null ? (Integer) nextMonitor[1] : -1;
-          long totalTime = (Long) monitor[2];
-          long spentTime = totalTime;
-          monitorsSb.append("\"").append(monitor[0]).append("\":\"").append(spentTime).append("/").append(totalTime).append("ms\"");
-          if (nextElementDeep != -1) {
-            if (currentDeep < nextElementDeep) {
-              monitorsSb.append(",\"subcalls\":[{");
-            } else if (currentDeep == nextElementDeep) {
-              monitorsSb.append("},{");
-            } else {
-              for (int d = nextElementDeep; d < currentDeep; d++) {
-                monitorsSb.append("}]");
-              }
-              monitorsSb.append("},{");
-            }
-          } else {
-              for (int d=currentDeep; d>1; d--) {
-                monitorsSb.append("}]");
-              }
-          }
-        }
-        monitorsSb.append("}]\n");
-        monitorsTL.get().clear();
-        try {
-          new FileWriter(outputFile, true).append(monitorsSb.toString()).close();
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-      }
-      decrDeep();
-    }
-
-    private static int incrDeep() {
-      int value = deepTL.get();
-      value += 1;
-      deepTL.set(value);
-      return value;
-    }
-
-    private static int decrDeep() {
-      int value = deepTL.get();
-      value -= 1;
-      deepTL.set(value);
-      return value;
-    }
-
-    public static void outputFile(String arg) {
-      outputFile = arg;
-    }
   }
 
   public void config(String configFilePath) {
@@ -146,9 +62,24 @@ public class PerfAgent implements ClassFileTransformer {
   private void addConfig(String line) {
     if(line.startsWith("-")) {
       addConfig(line.substring(1), untrackedClass);
+    } else if(line.startsWith("!")) {
+      addDebugInfo(line.substring(1));
+    } else if(line.startsWith(":")) {
+      String filePath = line.substring(1);
+      boolean appendFile = filePath.charAt(filePath.length()-1) == '+';
+      if(appendFile) {
+        filePath = filePath.substring(0, filePath.length()-1);
+      } else {
+        new File(filePath).delete();
+      }
+      PerfAgentHelper.outputFile(filePath);
     } else {
       addConfig(line, trackedClass);
     }
+  }
+
+  private void addDebugInfo(String clazz) {
+    this.debugClasses.add(clazz);
   }
 
   private void addConfig(String value, Map<String,Set<String>> set) {
@@ -229,33 +160,46 @@ public class PerfAgent implements ClassFileTransformer {
     return null;
   }
 
-  @Override public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
+  @Override public byte[] transform(ClassLoader loader, String classNameWithSlashes, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
       byte[] classfileBuffer) throws IllegalClassFormatException {
 
     byte[] byteCode;
-    String classname = className.replaceAll("[/]", ".");
-    Pair<String, String> trackedClassEntry = findTrackedClassEntry(classname);
-//    System.out.println("Check "+classname+"=>"+trackedClassEntry);
+    String className = classNameWithSlashes.replaceAll("[/]", ".");
+    Pair<String, String> trackedClassEntry = findTrackedClassEntry(className);
     if (trackedClassEntry!=null && trackedClassEntry.getLeft()!=null) {
       try {
         ClassPool cp = ClassPool.getDefault();
-        CtClass cc = cp.get(classname);
+        CtClass cc = cp.get(className);
+        boolean debug = debugClasses.contains(className);
         if (!cc.isFrozen()) {
           boolean isModified = false;
+          Set<String> methodsModified = new HashSet<>();
           for (CtMethod m : cc.getDeclaredMethods()) {
             if(checkMethod(m.getName(), trackedClassEntry.getLeft(), trackedClassEntry.getRight())) {
               if (!m.isEmpty()) {
+                methodsModified.add(m.getLongName());
                 m.addLocalVariable("monitorsIndex", CtClass.intType);
-                m.insertBefore("monitorsIndex = PerfAgent.PerfAgentHelper.beforeMethod(\"" + m.getLongName() + "\");");
-                m.insertAfter("{PerfAgent.PerfAgentHelper.afterMethod(monitorsIndex);}");
+                m.insertBefore("monitorsIndex = PerfAgentHelper.beforeMethod(\"" + m.getLongName() + "\", "+debug+");");
+                m.insertAfter("{PerfAgentHelper.afterMethod(monitorsIndex, "+debug+");}");
                 isModified = true;
               }
             }
           }
           if(isModified) {
+            if(debug) {
+              System.out.println(format("Class %s was modified. Methods tracked: %s.", className, methodsModified.toString()));
+            }
             byteCode = cc.toBytecode();
             cc.detach();
             return byteCode;
+          } else {
+            if(debug) {
+              System.out.println(format("Class %s is not modified because no method was marked as tracked", className));
+            }
+          }
+        } else {
+          if(debug) {
+            System.out.println(format("Class %s is frozen. Cant modified it with agent code%n", className));
           }
         }
       } catch (NotFoundException e) {
@@ -271,9 +215,9 @@ public class PerfAgent implements ClassFileTransformer {
   public static void premain(String agentArgs, Instrumentation inst) {
     if( agentArgs==null || agentArgs.trim().length()==0) {
       System.err.println("You must specify the path to configuration file for the agent. This file should have the name of class/method to track " +
-          "one entry per line. You can also specify wild card * or prefix the entry with - sign to explicitely not tracking this class or pattern. " +
-          "By default, stat file will be generated on /tmp/stats.log but you can override this value passing a second " +
-          "argument to the java agent with the file path where to put statistics separated by a comma from the config file path");
+          "one entry per line. You can also specify wild card * or prefix the entry with - sign to explicitly not tracking this class or pattern. " +
+          "By default, stat file will be generated on /tmp/stats.log but you can add a line starting with : to specify the file to use as output. If "
+          + "the file path end with + character, the output will be append at the end of the file if it already exist.");
       System.exit(9);
     }
     PerfAgent perfAgent = new PerfAgent(agentArgs.split(","));

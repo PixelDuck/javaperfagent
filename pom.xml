@@ -18,14 +18,19 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.javassist</groupId>
-            <artifactId>javassist</artifactId>
-            <version>3.18.0-GA</version>
-        </dependency>
-        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.3.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>18.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.javassist</groupId>
+            <artifactId>javassist</artifactId>
+            <version>3.18.0-GA</version>
         </dependency>
     </dependencies>
 
@@ -51,7 +56,6 @@
                     </execution>
                 </executions>
                 <configuration>
-
                     <archive>
                         <manifestEntries>
                             <Premain-Class>PerfAgent</Premain-Class>
