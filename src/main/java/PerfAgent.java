@@ -22,6 +22,19 @@ import javassist.NotFoundException;
 
 /**
  * An agent to track performances.
+ * The agent requires to pass the path to the configuration file.
+ * Ths configuration file is a text file based where each line can specify:
+ * <ul>
+ *  <li>the path for the file used to output data: This line should start with the character {@code :} followed by the path. If the line ends with
+ *  the character {@code +}, it means that the content should be append to the actual content of the file</li>
+ *  <li>a command starting with the sign {@code $}. Actual commands supported is {@code $nozero} which indicates to not log results if the
+ *  duration is equals to 0 ms</li>
+ *  <li>a full class name (means package with class name). for example {@code java.util.ArrayList}. You cam also specify an ending pattern for the
+ *  package terminating the line with the character {@code *}. For example the line {@code com.test.Test*} will activate tracking for all classes
+ *  from package {@code com.test} with a name starting with {@code Test}. You can also specify a method name like
+ *  {@code java.util.ArrayList.add()} to tracked a particular method. For each of this configuration, you can also start the line with the character
+ *  {@code -} in order to specify that you don't want to track this entry.
+ * </ul>
  */
 public class PerfAgent implements ClassFileTransformer {
 
@@ -64,6 +77,8 @@ public class PerfAgent implements ClassFileTransformer {
       addConfig(line.substring(1), untrackedClass);
     } else if(line.startsWith("!")) {
       addDebugInfo(line.substring(1));
+    } else if(line.startsWith("$")) {
+      PerfAgentHelper.addOption(line.substring(1));
     } else if(line.startsWith(":")) {
       String filePath = line.substring(1);
       boolean appendFile = filePath.charAt(filePath.length()-1) == '+';
@@ -214,10 +229,7 @@ public class PerfAgent implements ClassFileTransformer {
 
   public static void premain(String agentArgs, Instrumentation inst) {
     if( agentArgs==null || agentArgs.trim().length()==0) {
-      System.err.println("You must specify the path to configuration file for the agent. This file should have the name of class/method to track " +
-          "one entry per line. You can also specify wild card * or prefix the entry with - sign to explicitly not tracking this class or pattern. " +
-          "By default, stat file will be generated on /tmp/stats.log but you can add a line starting with : to specify the file to use as output. If "
-          + "the file path end with + character, the output will be append at the end of the file if it already exist.");
+      System.err.println("You must specify the path to configuration file for the agent.");
       System.exit(9);
     }
     PerfAgent perfAgent = new PerfAgent(agentArgs.split(","));

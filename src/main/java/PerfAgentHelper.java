@@ -19,6 +19,7 @@ public class PerfAgentHelper {
       return 0;
     }
   };
+  private static boolean noZeroMs = false;
 
   public static int beforeMethod(String methodName, boolean debug) {
     int deep = incrDeep();
@@ -32,7 +33,11 @@ public class PerfAgentHelper {
 
   public static void afterMethod(int monitorsIndex, boolean debug) {
     java.lang.Object[] ar = monitorsTL.get().get(monitorsIndex);
-    ar[2] = System.currentTimeMillis() - (Long) ar[2];
+    long duration = System.currentTimeMillis() - (Long) ar[2];
+    ar[2] = duration;
+    if (duration==0d && noZeroMs) {
+      monitorsTL.get().remove(monitorsIndex);
+    }
     int deep = (Integer)ar[1];
     if(debug) {
       System.out.println("Time spent on " + ar[0] + ": " + ar[2] + "ms. (deep: "+ deep
@@ -73,7 +78,10 @@ public class PerfAgentHelper {
       monitorsTL.get().clear();
       deepTL.set(0);
       try {
-        new FileWriter(outputFile, true).append(monitorsSb.toString()).close();
+        String content = monitorsSb.toString();
+        if(!content.equals("[{}]\n")) {
+          new FileWriter(outputFile, true).append(content).close();
+        }
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -108,5 +116,13 @@ public class PerfAgentHelper {
 
   public static void outputFile(String arg) {
     outputFile = arg;
+  }
+
+  public static void addOption(String option) {
+    switch(option) {
+    case "nozero":
+      noZeroMs = true;
+      break;
+    }
   }
 }
