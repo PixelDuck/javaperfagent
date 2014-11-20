@@ -19,7 +19,8 @@ public class PerfAgentHelper {
       return 0;
     }
   };
-  private static boolean noZeroMs = false;
+  public static long minTimeToTrackInMs = 0;
+  public static boolean trackParameters = false;
 
   public static int beforeMethod(String methodName, boolean debug) {
     int deep = incrDeep();
@@ -35,7 +36,7 @@ public class PerfAgentHelper {
     java.lang.Object[] ar = monitorsTL.get().get(monitorsIndex);
     long duration = System.currentTimeMillis() - (Long) ar[2];
     ar[2] = duration;
-    if (duration==0d && noZeroMs) {
+    if (duration < minTimeToTrackInMs) {
       monitorsTL.get().remove(monitorsIndex);
     }
     int deep = (Integer)ar[1];
@@ -118,11 +119,4 @@ public class PerfAgentHelper {
     outputFile = arg;
   }
 
-  public static void addOption(String option) {
-    switch(option) {
-    case "nozero":
-      noZeroMs = true;
-      break;
-    }
-  }
 }

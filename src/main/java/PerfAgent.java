@@ -21,20 +21,7 @@ import javassist.CtMethod;
 import javassist.NotFoundException;
 
 /**
- * An agent to track performances.
- * The agent requires to pass the path to the configuration file.
- * Ths configuration file is a text file based where each line can specify:
- * <ul>
- *  <li>the path for the file used to output data: This line should start with the character {@code :} followed by the path. If the line ends with
- *  the character {@code +}, it means that the content should be append to the actual content of the file</li>
- *  <li>a command starting with the sign {@code $}. Actual commands supported is {@code $nozero} which indicates to not log results if the
- *  duration is equals to 0 ms</li>
- *  <li>a full class name (means package with class name). for example {@code java.util.ArrayList}. You cam also specify an ending pattern for the
- *  package terminating the line with the character {@code *}. For example the line {@code com.test.Test*} will activate tracking for all classes
- *  from package {@code com.test} with a name starting with {@code Test}. You can also specify a method name like
- *  {@code java.util.ArrayList.add()} to tracked a particular method. For each of this configuration, you can also start the line with the character
- *  {@code -} in order to specify that you don't want to track this entry.
- * </ul>
+ * An agent to track performances. See {@link #printUsage()} for documentation.
  */
 public class PerfAgent implements ClassFileTransformer {
 
@@ -73,23 +60,65 @@ public class PerfAgent implements ClassFileTransformer {
   }
 
   private void addConfig(String line) {
-    if(line.startsWith("-")) {
-      addConfig(line.substring(1), untrackedClass);
-    } else if(line.startsWith("!")) {
-      addDebugInfo(line.substring(1));
-    } else if(line.startsWith("$")) {
-      PerfAgentHelper.addOption(line.substring(1));
-    } else if(line.startsWith(":")) {
-      String filePath = line.substring(1);
-      boolean appendFile = filePath.charAt(filePath.length()-1) == '+';
-      if(appendFile) {
-        filePath = filePath.substring(0, filePath.length()-1);
+    line = line.trim();
+    if(!line.isEmpty() && !line.startsWith("//")) {
+      if (line.startsWith("-")) {
+        addConfig(line.substring(1), untrackedClass);
+      } else if (line.startsWith("!")) {
+        addDebugInfo(line.substring(1));
+      } else if (line.startsWith("$")) {
+        addOption(line.substring(1));
+      } else if (line.startsWith(":")) {
+        String filePath = line.substring(1);
+        boolean appendFile = filePath.charAt(filePath.length() - 1) == '+';
+        if (appendFile) {
+          filePath = filePath.substring(0, filePath.length() - 1);
+        } else {
+          new File(filePath).delete();
+        }
+        PerfAgentHelper.outputFile(filePath);
       } else {
-        new File(filePath).delete();
+        addConfig(line, trackedClass);
       }
-      PerfAgentHelper.outputFile(filePath);
-    } else {
-      addConfig(line, trackedClass);
+    }
+  }
+
+  private static void printUsage() {
+    System.out.println(
+    "To plug the agent, add to JVM option -javaagent:<PATH_TO_JAR>=<PATH_TO_CONFIG_FILE>.\n"
+        + "Configuration file is a simple text file.\n"
+        + "If line starts with '//' then this is a comment line\n"
+        + "You should specify where to write results with a line starting with ':' followed by the path to the config file. Example:\n"
+        + "\t:/tmp/stats.json\n"
+        + "You can add some options starting with the character '$'. Options available are:\n"
+        + "\t$minTimeToTrackInMs=<TIME IN MS>\n"
+        + "\t  specifies the minimum time to match in order to log results from this method\n"
+        + "\t$trackParameters\n"
+        + "\t  specifies that parameters should be tracked\n"
+        + "You should add some classes or methods to track with: \n"
+        + "\t* A full class name (means package with class name). for example:\n"
+        + "\t\tjava.util.ArrayList\n"
+        + "\t* You can also specify an ending pattern for the package terminating the line with the character '*'. For example:\n"
+        + "\t\tcom.test.Test*\n"
+        + "\t  will activate tracking for all classes from package 'com.test' with a name starting with 'Test'.\n"
+        + "\t* You can also specify a method name like\n"
+        + "\t\tjava.util.ArrayList.add()\n"
+        + "\t  to track a particular method. Notice that '*' suffix do not work with method names\n"
+        + "\t* For each of this configuration, you can start the line with the character '-' in order to specify that you don't want to track this entry. Example:\n"
+        + "\t\t-com.test.Test.remove(int)\n"
+        + "\t  will not track the method 'remove(int)' from class 'com.test.Test'\n"
+    );
+  }
+
+  public static void addOption(String option) {
+    String[] split = option.split("=");
+    switch(split[0]) {
+    case "minTimeToTrackInMs":
+      PerfAgentHelper.minTimeToTrackInMs = Long.parseLong(split[1]);
+      break;
+    case "trackParameters":
+      PerfAgentHelper.trackParameters = split.length==1 || "true".equalsIgnoreCase(split[1]);
+      break;
     }
   }
 
@@ -237,12 +266,7 @@ public class PerfAgent implements ClassFileTransformer {
   }
 
   public static void main(String[] args) {
-    PerfAgent perfAgent = new PerfAgent("/Users/olmartin/Documents/statsagent.cfg,/tmp/stats.log".split(","));
-    Pair<String, String> trackedClassEntry = perfAgent.findTrackedClassEntry("com.test.Remove");
-    System.out.println(trackedClassEntry);
-    if (trackedClassEntry != null) {
-      System.out.println(perfAgent.checkMethod("test3()", trackedClassEntry.getLeft(), trackedClassEntry.getRight()));
-    }
+    printUsage();
   }
 }
 
