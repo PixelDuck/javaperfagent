@@ -25,8 +25,9 @@ import javassist.NotFoundException;
  */
 public class PerfAgent implements ClassFileTransformer {
 
-  private Map<String,Set<String>> trackedClass = new HashMap<>();
-  private Map<String,Set<String>> untrackedClass = new HashMap<>();
+  private static boolean trackParameters = false;
+  private Map<String, Pair<Map<String,Boolean>, Boolean>> trackedClass = new HashMap<>();
+  private Map<String, Pair<Map<String,Boolean>, Boolean>> untrackedClass = new HashMap<>();
   private Set<String> debugClasses = new HashSet<>();
 
   public PerfAgent(String ... args) {
@@ -62,8 +63,12 @@ public class PerfAgent implements ClassFileTransformer {
   private void addConfig(String line) {
     line = line.trim();
     if(!line.isEmpty() && !line.startsWith("//")) {
-      if (line.startsWith("-")) {
-        addConfig(line.substring(1), untrackedClass);
+      if (line.startsWith("+")) {
+        addConfig(line, trackedClass, false);
+      } else if (line.startsWith("#")) {
+        addConfig(line.substring(1), trackedClass, true);
+      } else if (line.startsWith("-")) {
+        addConfig(line.substring(1), untrackedClass, false);
       } else if (line.startsWith("!")) {
         addDebugInfo(line.substring(1));
       } else if (line.startsWith("$")) {
@@ -77,71 +82,42 @@ public class PerfAgent implements ClassFileTransformer {
           new File(filePath).delete();
         }
         PerfAgentHelper.outputFile(filePath);
-      } else {
-        addConfig(line, trackedClass);
       }
     }
-  }
-
-  private static void printUsage() {
-    System.out.println(
-    "To plug the agent, add to JVM option -javaagent:<PATH_TO_JAR>=<PATH_TO_CONFIG_FILE>.\n"
-        + "Configuration file is a simple text file.\n"
-        + "If line starts with '//' then this is a comment line\n"
-        + "You should specify where to write results with a line starting with ':' followed by the path to the config file. Example:\n"
-        + "\t:/tmp/stats.json\n"
-        + "You can add some options starting with the character '$'. Options available are:\n"
-        + "\t$minTimeToTrackInMs=<TIME IN MS>\n"
-        + "\t  specifies the minimum time to match in order to log results from this method\n"
-        + "\t$trackParameters\n"
-        + "\t  specifies that parameters should be tracked\n"
-        + "You should add some classes or methods to track with: \n"
-        + "\t* A full class name (means package with class name). for example:\n"
-        + "\t\tjava.util.ArrayList\n"
-        + "\t* You can also specify an ending pattern for the package terminating the line with the character '*'. For example:\n"
-        + "\t\tcom.test.Test*\n"
-        + "\t  will activate tracking for all classes from package 'com.test' with a name starting with 'Test'.\n"
-        + "\t* You can also specify a method name like\n"
-        + "\t\tjava.util.ArrayList.add()\n"
-        + "\t  to track a particular method. Notice that '*' suffix do not work with method names\n"
-        + "\t* For each of this configuration, you can start the line with the character '-' in order to specify that you don't want to track this entry. Example:\n"
-        + "\t\t-com.test.Test.remove(int)\n"
-        + "\t  will not track the method 'remove(int)' from class 'com.test.Test'\n"
-    );
   }
 
   public static void addOption(String option) {
     String[] split = option.split("=");
     switch(split[0]) {
-    case "minTimeToTrackInMs":
-      PerfAgentHelper.minTimeToTrackInMs = Long.parseLong(split[1]);
-      break;
-    case "trackParameters":
-      PerfAgentHelper.trackParameters = split.length==1 || "true".equalsIgnoreCase(split[1]);
-      break;
-    }
+      case "minTimeToTrackInMs":
+        PerfAgentHelper.minTimeToTrackInMs = Long.parseLong(split[1]);
+        break;
+      case "trackParameters":
+        trackParameters = split.length==1 || "true".equalsIgnoreCase(split[1]);
+        break;
+      }
   }
 
   private void addDebugInfo(String clazz) {
     this.debugClasses.add(clazz);
   }
 
-  private void addConfig(String value, Map<String,Set<String>> set) {
+  private void addConfig(String value, Map<String, Pair<Map<String,Boolean>, Boolean>> set, boolean trackParameter) {
     int i = value.indexOf("(");
     if(i >= 0) {
       int endClassIndex = value.substring(0, i).lastIndexOf('.');
       String className = value.substring(0, endClassIndex);
       String methodName = value.substring(endClassIndex+1);
-      Set<String> methodList = set.get(className);
+      Pair<Map<String,Boolean>, Boolean> methodList = set.get(className);
       if(methodList == null) {
-        methodList = new HashSet<>();
+        methodList = Pair.of((Map<String,Boolean>)new HashMap<String,Boolean>(), false);
         set.put(className, methodList);
       }
-      methodList.add(methodName);
+      methodList.getLeft().put(methodName, trackParameter);
     } else {
-      Set<String> methodList = set.get(value);
+      Pair<Map<String,Boolean>, Boolean> methodList = set.get(value);
       if (methodList == null) {
-        methodList = new HashSet<>();
+        methodList = Pair.of((Map<String,Boolean>)new HashMap<String,Boolean>(), trackParameter);
         set.put(value, methodList);
       }
     }
@@ -152,7 +128,7 @@ public class PerfAgent implements ClassFileTransformer {
     if(entry!=null) {
       String untrackedEntry = findEntry(className, untrackedClass);
       if (untrackedEntry!=null) {
-        if(untrackedClass.get(untrackedEntry) != null && untrackedClass.get(untrackedEntry).size()>0) {
+        if(untrackedClass.get(untrackedEntry) != null && untrackedClass.get(untrackedEntry).getLeft().size()>0) {
           return Pair.of(entry, untrackedEntry);
         } else {
           return null;
@@ -166,19 +142,29 @@ public class PerfAgent implements ClassFileTransformer {
   }
 
   public boolean checkMethod(String methodName, String entryClassName, String entryClassNameInUntracked) {
-    return checkMethodEntry(methodName, trackedClass.get(entryClassName))
-        && (entryClassNameInUntracked==null || !checkMethodEntry(methodName, untrackedClass.get(entryClassNameInUntracked)));
+    return checkMethodEntry(methodName, trackedClass.get(entryClassName).getLeft())
+        && (entryClassNameInUntracked==null || !checkMethodEntry(methodName, untrackedClass.get(entryClassNameInUntracked).getLeft()));
   }
 
-  private boolean checkMethodEntry(String methodName, Set<String> set) {
+  public boolean checkTrackParam(String methodName, String entryClassName) {
+    Pair<Map<String, Boolean>, Boolean> map = trackedClass.get(entryClassName);
+    boolean trackParam = map.getRight().booleanValue();
+    Boolean aBoolean = map.getLeft().get(methodName);
+    if(aBoolean!=null){
+      trackParam = aBoolean.booleanValue();
+    }
+    return trackParam;
+  }
+
+  private boolean checkMethodEntry(String methodName, Map<String,Boolean> set) {
     if (set==null)
       return false;
     if(set.size()==0)
       return true;
-    if(set.contains(methodName)) {
+    if(set.containsKey(methodName)) {
       return true;
     } else {
-      for(String entry : set) {
+      for(String entry : set.keySet()) {
         if(entry.lastIndexOf("*")>=0) {
           if(methodName.startsWith(entry.substring(0, entry.length()-1))) {
             return true;
@@ -189,7 +175,7 @@ public class PerfAgent implements ClassFileTransformer {
     return false;
   }
 
-  private String findEntry(String className, Map<String, Set<String>> set) {
+  private String findEntry(String className, Map<String, Pair<Map<String,Boolean>, Boolean>> set) {
     if(set.containsKey(className)) {
       return className;
     } else {
@@ -220,10 +206,14 @@ public class PerfAgent implements ClassFileTransformer {
           Set<String> methodsModified = new HashSet<>();
           for (CtMethod m : cc.getDeclaredMethods()) {
             if(checkMethod(m.getName(), trackedClassEntry.getLeft(), trackedClassEntry.getRight())) {
-              if (!m.isEmpty()) {
+              if (!m.isEmpty() && m.getMethodInfo().getCodeAttribute()!=null) {
                 methodsModified.add(m.getLongName());
                 m.addLocalVariable("monitorsIndex", CtClass.intType);
-                m.insertBefore("monitorsIndex = PerfAgentHelper.beforeMethod(\"" + m.getLongName() + "\", "+debug+");");
+                if(checkTrackParam(m.getName(), trackedClassEntry.getLeft()) || trackParameters) {
+                  m.insertBefore("monitorsIndex = PerfAgentHelper.beforeMethod(\"" + m.getLongName() + "\", " + debug + ", $args);");
+                } else {
+                  m.insertBefore("monitorsIndex = PerfAgentHelper.beforeMethod(\"" + m.getLongName() + "\", " + debug + ", null);");
+                }
                 m.insertAfter("{PerfAgentHelper.afterMethod(monitorsIndex, "+debug+");}");
                 isModified = true;
               }
@@ -268,5 +258,36 @@ public class PerfAgent implements ClassFileTransformer {
   public static void main(String[] args) {
     printUsage();
   }
+
+  private static void printUsage() {
+    System.out.println(
+        "To plug the agent, add to JVM option -javaagent:<PATH_TO_JAR>=<PATH_TO_CONFIG_FILE>.\n"
+            + "Configuration file is a simple text file.\n"
+            + "If line starts with '//' then this is a comment line\n"
+            + "You should specify where to write results with a line starting with ':' followed by the path to the config file. Example:\n"
+            + "\t:/tmp/stats.json\n"
+            + "You can add some options starting with the character '$'. Options available are:\n"
+            + "\t$minTimeToTrackInMs=<TIME IN MS>\n"
+            + "\t  specifies the minimum time to match in order to log results from this method\n"
+            + "\t$trackParameters\n"
+            + "\t  specifies that parameters should be tracked\n"
+            + "You should add some classes or methods to track with: \n"
+            + "\t* A full class name (means package with class name) starting with '+'. for example:\n"
+            + "\t\t+java.util.ArrayList\n"
+            + "\t* You can also specify an ending pattern for the package terminating the line with the character '*'. For example:\n"
+            + "\t\t+com.test.Test*\n"
+            + "\t  will activate tracking for all classes from package 'com.test' with a name starting with 'Test'.\n"
+            + "\t* You can also specify a method name like\n"
+            + "\t\t+java.util.ArrayList.add()\n"
+            + "\t  to track a particular method. Notice that '*' suffix do not work with method names\n"
+            + "\t* For each of this configuration, you can start the line with the character '-' in order to specify that you don't want to track this entry. Example:\n"
+            + "\t\t-com.test.Test.remove(int)\n"
+            + "\t  will not track the method 'remove(int)' from class 'com.test.Test'\n"
+            + "\t* For each of this configuration, you can start the line with the character '#' in order to specify that you want to track parameters for this entry. Example:\n"
+            + "\t\t#com.test.Test.remove(int)\n"
+            + "\t  will track the method 'remove(int)' from class 'com.test.Test' and the parameter value from type 'int' will be tracked also\n"
+    );
+  }
+
 }
 
