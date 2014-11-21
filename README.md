@@ -15,7 +15,7 @@ specifies that parameters should be tracked
 * You should add some classes or methods to track with: 
   * A full class name (means package with class name) starting with '+'. for example:
   <code>+java.util.ArrayList</code>
-  * You can also specify an ending pattern for the package terminating the line with the character '\*'. For example:  hello so yeah.bye.<code>+com.test.Test*</code> will activate tracking for all classes from package 'com.test' with a name starting with 'Test'.
+  * You can also specify an ending pattern for the package terminating the line with the character '\*'. For example:  <code>+com.test.Test*</code> will activate tracking for all classes from package 'com.test' with a name starting with 'Test'.
   * You can also specify a method name like <code>+java.util.ArrayList.add()</code> to track a particular method. Notice that '*' suffix do not work with method names
   * For each of this configuration, you can start the line with the character '-' in order to specify that you don't want to   track this entry. Example: <code>-com.test.Test.remove(int)</code> will not track the method 'remove(int)' from class 'com.test.Test'
   * For each of this configuration, you can start the line with the character '#' in order to specify that you want to track parameters for this entry. Example: <code>#com.test.Test.remove(int)</code> will track the method 'remove(int)' from class 'com.test.Test' and the parameter value from type 'int' will be tracked also
