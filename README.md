@@ -21,16 +21,15 @@ specifies that parameters should be tracked
   * For each of this configuration, you can start the line with the character '#' in order to specify that you want to track parameters for this entry. Example: <code>#com.test.Test.remove(int)</code> will track the method 'remove(int)' from class 'com.test.Test' and the parameter value from type 'int' will be tracked also
 
 Config file example:
-  // output file
-  :/tmp/stats.json
-  
-   // options
-  $minTimeToTrackInMs=5
-  
-  // classes and methods to track
-  +com.mypackage.*
-  #com.mypackage.service.*
-  -com.mypackage.dao.MyDao.create*()`
+
+ // output file
+ :/tmp/stats.json
+ // options
+ $minTimeToTrackInMs=5
+ // classes and methods to track
+ \+com.mypackage.\*
+ \#com.mypackage.service.\*
+ \-com.mypackage.dao.MyDao.create\*()
 
 Next steps
 * implments on GUI copy to file
