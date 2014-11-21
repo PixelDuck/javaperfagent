@@ -2,7 +2,7 @@ javaperfagent
 =============
 
 An agent to track performances. Results are written into a file on the server in a JSON format. A GUI is available to help analysing results.
-To plug the agent, add to JVM option -javaagent:<PATH_TO_JAR>=<PATH_TO_CONFIG_FILE>.
+To plug the agent, add to JVM option -javaagent:\<PATH_TO_JAR\>=\<PATH_TO_CONFIG_FILE\>.
 Configuration file is a simple text file:
 * If line starts with '//' then this is a comment line
 * You should specify where to write results with a line starting with ':' followed by the path to the config file. Example:
