@@ -49,3 +49,13 @@ will not track the method 'remove(int)' from class 'com.test.Test'
 	#com.test.Test.remove(int)
 	
 will track the method 'remove(int)' from class 'com.test.Test' and the parameter value from type 'int' will be tracked also
+
+
+Next steps
+* implments on GUI copy to file
+* implements on GUI auto expand
+* implements on GUI search on name
+* implements on GUI search on time spent with expand 
+* implements output to http socket / implements GUI input socket listener
+* implement linking calls from differents thread
+* implemnts filtering
