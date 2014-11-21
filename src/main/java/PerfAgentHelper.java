@@ -101,7 +101,7 @@ public class PerfAgentHelper {
       return null;
     }
     else {
-      return "[{"+monitorsSb.toString()+"}]";
+      return "[{"+monitorsSb.toString()+"}]\n";
     }
   }
 
@@ -119,7 +119,12 @@ public class PerfAgentHelper {
         sb.append(parameterValues[i]);
       }
       sb.append(")");
-      return sb.toString().replace("\"", "\\\"");
+      return sb.toString()
+          .replace("'", "\'")
+          .replace("\\", "\\\\")
+          .replace("\n", "\\\n")
+          .replace("\t", "\\\t")
+          .replace("\"", "\\\"");
     }
   }
 

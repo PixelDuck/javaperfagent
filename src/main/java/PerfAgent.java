@@ -26,6 +26,7 @@ import javassist.NotFoundException;
 public class PerfAgent implements ClassFileTransformer {
 
   private static boolean trackParameters = false;
+  private static boolean debugConfigFile = false;
   private Map<String, Pair<Map<String,Boolean>, Boolean>> trackedClass = new HashMap<>();
   private Map<String, Pair<Map<String,Boolean>, Boolean>> untrackedClass = new HashMap<>();
   private Set<String> debugClasses = new HashSet<>();
@@ -64,16 +65,34 @@ public class PerfAgent implements ClassFileTransformer {
     line = line.trim();
     if(!line.isEmpty() && !line.startsWith("//")) {
       if (line.startsWith("+")) {
-        addConfig(line, trackedClass, false);
+        if(debugConfigFile) {
+          System.out.println("track "+line.substring(1));
+        }
+        addConfig(line.substring(1), trackedClass, false);
       } else if (line.startsWith("#")) {
+        if(debugConfigFile) {
+          System.out.println("track with parameter "+line.substring(1));
+        }
         addConfig(line.substring(1), trackedClass, true);
       } else if (line.startsWith("-")) {
+        if(debugConfigFile) {
+          System.out.println("untrack "+line.substring(1));
+        }
         addConfig(line.substring(1), untrackedClass, false);
       } else if (line.startsWith("!")) {
+        if(debugConfigFile) {
+          System.out.println("debug "+line.substring(1));
+        }
         addDebugInfo(line.substring(1));
       } else if (line.startsWith("$")) {
+        if(debugConfigFile) {
+          System.out.println("command found "+line.substring(1));
+        }
         addOption(line.substring(1));
       } else if (line.startsWith(":")) {
+        if(debugConfigFile) {
+          System.out.println("output to "+line.substring(1));
+        }
         String filePath = line.substring(1);
         boolean appendFile = filePath.charAt(filePath.length() - 1) == '+';
         if (appendFile) {
@@ -91,6 +110,9 @@ public class PerfAgent implements ClassFileTransformer {
     switch(split[0]) {
       case "minTimeToTrackInMs":
         PerfAgentHelper.minTimeToTrackInMs = Long.parseLong(split[1]);
+        break;
+      case "debugConfigFile":
+        debugConfigFile = split.length==1 || "true".equalsIgnoreCase(split[1]);
         break;
       case "trackParameters":
         trackParameters = split.length==1 || "true".equalsIgnoreCase(split[1]);
@@ -149,9 +171,24 @@ public class PerfAgent implements ClassFileTransformer {
   public boolean checkTrackParam(String methodName, String entryClassName) {
     Pair<Map<String, Boolean>, Boolean> map = trackedClass.get(entryClassName);
     boolean trackParam = map.getRight().booleanValue();
-    Boolean aBoolean = map.getLeft().get(methodName);
+    Map<String, Boolean> methods = map.getLeft();
+    Boolean aBoolean = methods.get(methodName);
     if(aBoolean!=null){
       trackParam = aBoolean.booleanValue();
+    } else {
+      String keyFound = null;
+      for (String entry : methods.keySet()) {
+        if (entry.lastIndexOf("*") >= 0) {
+          if (methodName.startsWith(entry.substring(0, entry.length() - 1))) {
+            keyFound = entry;
+          }
+        }
+      }
+      if (keyFound != null) {
+        Boolean val = methods.get(keyFound);
+        if (val != null)
+          return val.booleanValue();
+      }
     }
     return trackParam;
   }
@@ -179,15 +216,17 @@ public class PerfAgent implements ClassFileTransformer {
     if(set.containsKey(className)) {
       return className;
     } else {
+      String keyFound = null;
       for(String key : set.keySet()) {
         if (key.endsWith("*")) {
           if (className.startsWith(key.substring(0, key.length()-2))) {
-            return key;
+            if(keyFound==null || keyFound.length() < key.length())
+              keyFound = key;
           }
         }
       }
+      return keyFound;
     }
-    return null;
   }
 
   @Override public byte[] transform(ClassLoader loader, String classNameWithSlashes, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
@@ -247,11 +286,14 @@ public class PerfAgent implements ClassFileTransformer {
   }
 
   public static void premain(String agentArgs, Instrumentation inst) {
+    System.out.println("Activate perf agent");
     if( agentArgs==null || agentArgs.trim().length()==0) {
       System.err.println("You must specify the path to configuration file for the agent.");
       System.exit(9);
     }
-    PerfAgent perfAgent = new PerfAgent(agentArgs.split(","));
+    String[] param = agentArgs.split(",");
+    System.out.println("Perf agent config file: "+param[0]);
+    PerfAgent perfAgent = new PerfAgent(param);
     inst.addTransformer(perfAgent);
   }
 
@@ -271,6 +313,8 @@ public class PerfAgent implements ClassFileTransformer {
             + "\t  specifies the minimum time to match in order to log results from this method\n"
             + "\t$trackParameters\n"
             + "\t  specifies that parameters should be tracked\n"
+            + "\t$debugConfigFile\n"
+            + "\t  debug configuration analysis\n"
             + "You should add some classes or methods to track with: \n"
             + "\t* A full class name (means package with class name) starting with '+'. for example:\n"
             + "\t\t+java.util.ArrayList\n"
