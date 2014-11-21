@@ -22,15 +22,15 @@ specifies that parameters should be tracked
 
 Config file example:
   // output file
- :/tmp/stats.json
- 
- // options
- $minTimeToTrackInMs=5
- 
- // classes and methods to track
- +com.mypackage.*
- #com.mypackage.service.*
- -com.mypackage.dao.MyDao.create*()
+  :/tmp/stats.json
+  
+   // options
+  $minTimeToTrackInMs=5
+  
+  // classes and methods to track
+  +com.mypackage.*
+  #com.mypackage.service.*
+  -com.mypackage.dao.MyDao.create*()`
 
 Next steps
 * implments on GUI copy to file
