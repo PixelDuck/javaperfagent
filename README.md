@@ -8,10 +8,14 @@ Configuration file is a simple text file:
 * You should specify where to write results with a line starting with ':' followed by the path to the config file. Example:
 <code>:/tmp/stats.json</code>
 * You can add some options starting with the character '$'. Options available are:
-  * <code>$minTimeToTrackInMs=<TIME IN MS></code>
-specifies the minimum time to match in order to log results from this method
+  * <code>$minRootTimeToTrackInMicros=<TIME IN microseconds></code>
+specifies the minimum time for the root tracker to match in order to log results from this method
+  * <code>minTimeToTrackInMicros=<TIME IN microseconds></code>
+specifies the minimum time to match for a subcall in order to log results from this method
   * <code>$trackParameters</code>
 specifies that parameters should be tracked
+  * <code>$debugConfigFile</code>
+specifies that configuration loading should output debug informaiton
 * You should add some classes or methods to track with: 
   * A full class name (means package with class name) starting with '+'. for example:
   <code>+java.util.ArrayList</code>
@@ -32,7 +36,6 @@ Config file example:
  \-com.mypackage.dao.MyDao.create\*()
 
 Next steps
-* implments on GUI copy to file
 * implements on GUI auto expand
 * implements on GUI search on name
 * implements on GUI search on time spent with expand 
