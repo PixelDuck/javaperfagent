@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
@@ -38,7 +39,11 @@ public class PerfAgent implements ClassFileTransformer {
   public void config(String configFilePath) {
     BufferedReader reader = null;
     try {
-      reader = new BufferedReader(new FileReader(configFilePath));
+      if(new File(configFilePath).exists()) {
+        reader = new BufferedReader(new FileReader(configFilePath));
+      } else {
+        reader = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(configFilePath)));
+      }
       String line;
       do {
         line = reader.readLine();
@@ -100,7 +105,7 @@ public class PerfAgent implements ClassFileTransformer {
         } else {
           new File(filePath).delete();
         }
-        PerfAgentHelper.outputFile(filePath);
+        PerfAgentMonitor.outputFile(filePath);
       }
     }
   }
@@ -108,8 +113,11 @@ public class PerfAgent implements ClassFileTransformer {
   public static void addOption(String option) {
     String[] split = option.split("=");
     switch(split[0]) {
-      case "minTimeToTrackInMs":
-        PerfAgentHelper.minTimeToTrackInMs = Long.parseLong(split[1]);
+      case "minTimeToTrackInMicros":
+        PerfAgentMonitor.minTimeToTrackInMicros = Long.parseLong(split[1]);
+        break;
+      case "minRootTimeToTrackInMicros":
+        PerfAgentMonitor.minRootTimeToTrackInMicros = Long.parseLong(split[1]);
         break;
       case "debugConfigFile":
         debugConfigFile = split.length==1 || "true".equalsIgnoreCase(split[1]);
@@ -249,11 +257,11 @@ public class PerfAgent implements ClassFileTransformer {
                 methodsModified.add(m.getLongName());
                 m.addLocalVariable("monitorsIndex", CtClass.intType);
                 if(checkTrackParam(m.getName(), trackedClassEntry.getLeft()) || trackParameters) {
-                  m.insertBefore("monitorsIndex = PerfAgentHelper.beforeMethod(\"" + m.getLongName() + "\", " + debug + ", $args);");
+                  m.insertBefore("monitorsIndex = PerfAgentMonitor.beforeMethod(\"" + m.getLongName() + "\", " + debug + ", $args);");
                 } else {
-                  m.insertBefore("monitorsIndex = PerfAgentHelper.beforeMethod(\"" + m.getLongName() + "\", " + debug + ", null);");
+                  m.insertBefore("monitorsIndex = PerfAgentMonitor.beforeMethod(\"" + m.getLongName() + "\", " + debug + ", null);");
                 }
-                m.insertAfter("{PerfAgentHelper.afterMethod(monitorsIndex, "+debug+");}");
+                m.insertAfter("{PerfAgentMonitor.afterMethod(monitorsIndex, "+debug+");}");
                 isModified = true;
               }
             }
@@ -309,8 +317,10 @@ public class PerfAgent implements ClassFileTransformer {
             + "You should specify where to write results with a line starting with ':' followed by the path to the config file. Example:\n"
             + "\t:/tmp/stats.json\n"
             + "You can add some options starting with the character '$'. Options available are:\n"
-            + "\t$minTimeToTrackInMs=<TIME IN MS>\n"
-            + "\t  specifies the minimum time to match in order to log results from this method\n"
+            + "\t$minRootTimeToTrackInMicros=<TIME IN MS>\n"
+            + "\t  specifies the minimum time for the root call to match in order to log results from this method\n"
+            + "\t$minTimeToTrackInMicros=<TIME IN MS>\n"
+            + "\t  specifies the minimum time on a call to match in order to log results from this method\n"
             + "\t$trackParameters\n"
             + "\t  specifies that parameters should be tracked\n"
             + "\t$debugConfigFile\n"

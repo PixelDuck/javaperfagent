@@ -1,16 +1,18 @@
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Perf agent helper class.
+ * Monitor for classes instrumented.
+ * @author olmartin
  */
-public class PerfAgentHelper {
+public class PerfAgentMonitor {
 
   private static String outputFile = "/tmp/stats.json";
 
-  public static ThreadLocal<ArrayList<Object[]>> monitorsTL = new ThreadLocal<ArrayList<Object[]>>() {
-    @Override protected ArrayList<Object[]> initialValue() {
+  public static ThreadLocal<List<TrackInfo>> monitorsTL = new ThreadLocal<List<TrackInfo>>() {
+    @Override protected List<TrackInfo> initialValue() {
       return new ArrayList<>();
     }
   };
@@ -19,7 +21,25 @@ public class PerfAgentHelper {
       return 0;
     }
   };
-  public static long minTimeToTrackInMs = 0;
+  public static long minTimeToTrackInMicros = 0;
+  public static long minRootTimeToTrackInMicros = 0;
+
+  private static class TrackInfo{
+    String methodName;
+    int deep;
+    long startTime;
+    long durationInMicros;
+    Object[] paramValues;
+    TrackInfo(String methodName,
+        int deep,
+        long startTime,
+        Object[] paramValues) {
+      this.methodName = methodName;
+      this.deep = deep;
+      this.startTime = startTime;
+      this.paramValues = paramValues;
+    }
+  }
 
   public static int beforeMethod(String methodName, boolean debug, Object ... paramValues) {
     int deep = incrDeep();
@@ -27,29 +47,30 @@ public class PerfAgentHelper {
     if(debug) {
       System.out.println("Method "+methodName+" is called (deep: "+deep+" called from "+findParent(monitorsIndex, deep)+")");
     }
-    monitorsTL.get().add(new Object[] { methodName, deep, System.currentTimeMillis(), paramValues });
+    monitorsTL.get().add(new TrackInfo(methodName, deep, System.nanoTime()/1000, paramValues));
     return monitorsIndex;
   }
 
   public static void afterMethod(int monitorsIndex, boolean debug) {
-    java.lang.Object[] ar = monitorsTL.get().get(monitorsIndex);
-    long duration = System.currentTimeMillis() - (Long) ar[2];
-    ar[2] = duration;
-    if (duration < minTimeToTrackInMs) {
+    long now = System.nanoTime()/1000;
+    TrackInfo trackInfo = monitorsTL.get().get(monitorsIndex);
+    trackInfo.durationInMicros = now - trackInfo.startTime;
+    if (trackInfo.durationInMicros < minTimeToTrackInMicros) {
       if (debug) {
-        int deep = (Integer) ar[1];
-        System.out.println("Time spent on " + ar[0] + ": " + ar[2] + "ms. (deep: " + deep
-            + " called from " + findParent(monitorsIndex, deep) + "). Ignored because below " + minTimeToTrackInMs + "ms");
+        System.out.println("Time spent on " + trackInfo.methodName + ": " + (trackInfo.durationInMicros/1000) + "˜ms. (deep: " + trackInfo.deep
+            + " called from " + findParent(monitorsIndex, trackInfo.deep) + "). Ignored because below " + (minTimeToTrackInMicros/1000) + "ms");
       }
       monitorsTL.get().remove(monitorsIndex);
     }
-    int deep = (Integer) ar[1];
     if (debug) {
-      System.out.println("Time spent on " + ar[0] + ": " + ar[2] + "ms. (deep: " + deep
-          + " called from " + findParent(monitorsIndex, deep) + ")");
+      System.out.println("Time spent on " + trackInfo.methodName + ": " + (trackInfo.durationInMicros/1000) + "ms. (deep: " + trackInfo.deep
+          + " called from " + findParent(monitorsIndex, trackInfo.deep) + ")");
     }
-    if (deep == 1) {
-      String content = createJsonFromStack(monitorsTL.get());
+    if (trackInfo.deep == 1) {
+      String content = null;
+      if (trackInfo.durationInMicros >= minRootTimeToTrackInMicros) {
+        content = createJsonFromStack(monitorsTL.get());
+      }
       monitorsTL.get().clear();
       deepTL.set(0);
       try {
@@ -57,7 +78,7 @@ public class PerfAgentHelper {
           new FileWriter(outputFile, true).append(content).close();
         } else {
           if (debug) {
-            System.out.println("Content for " + ar[0] + " null");
+            System.out.println("Content for " + trackInfo.methodName + " null");
           }
         }
       } catch (IOException e) {
@@ -68,18 +89,18 @@ public class PerfAgentHelper {
     }
   }
 
-  private static String createJsonFromStack(ArrayList<Object[]> objects) {
+  private static String createJsonFromStack(List<TrackInfo> trackInfos) {
     StringBuilder monitorsSb = new StringBuilder();
-    for (int i1 = 0; i1 < objects.size(); i1++) {
-      Object[] monitor = objects.get(i1);
-      Object[] nextMonitor = (i1 < objects.size() - 1) ? objects.get(i1 + 1) : null;
-      int currentDeep = (Integer) monitor[1];
-      int nextElementDeep = nextMonitor != null ? (Integer) nextMonitor[1] : -1;
+    for (int i1 = 0; i1 < trackInfos.size(); i1++) {
+      TrackInfo trackInfo = trackInfos.get(i1);
+      TrackInfo nextTrackInfo = (i1 < trackInfos.size() - 1) ? trackInfos.get(i1 + 1) : null;
+      int currentDeep = trackInfo.deep;
+      int nextElementDeep = nextTrackInfo != null ? nextTrackInfo.deep : -1;
       boolean isNextCallSubCall = nextElementDeep==(currentDeep+1);
       boolean isNextCallSequentialCall = nextElementDeep==currentDeep;
-      boolean isLastCall = nextMonitor==null;
-      long totalTime = (Long) monitor[2];
-      monitorsSb.append("\"").append(toMethodName((String)monitor[0], (Object[])monitor[3])).append("\":\"").append(totalTime).append("ms\"");
+      boolean isLastCall = nextTrackInfo==null;
+      double totalTime = (double)trackInfo.durationInMicros/1000;
+      monitorsSb.append("\"").append(toMethodName(trackInfo.methodName, trackInfo.paramValues)).append("\":\"").append(totalTime).append("ms\"");
       if (isLastCall) {
         for (int d = currentDeep; d > 1; d--) {
           monitorsSb.append("}]");
@@ -130,9 +151,9 @@ public class PerfAgentHelper {
 
   private static String findParent(int monitorsIndex, int deep) {
     for(int i=monitorsIndex-1; i>=0; i--) {
-      java.lang.Object[] ar = monitorsTL.get().get(i);
-      if(ar[1]==deep-1) {
-        return (String) ar[0];
+      TrackInfo trackInfo = monitorsTL.get().get(i);
+      if(trackInfo.deep==deep-1) {
+        return trackInfo.methodName;
       }
     }
     return null;
