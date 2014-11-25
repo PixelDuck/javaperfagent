@@ -27,7 +27,7 @@ specifies that configuration loading should output debug informaiton
 Config file example:
 ```
  // output file
-  :/tmp/stats.json
+ :/tmp/stats.json
  // options
  $minRootTimeToTrackInMicros=200
  // classes and methods to track
