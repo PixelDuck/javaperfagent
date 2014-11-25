@@ -10,7 +10,7 @@ Configuration file is a simple text file:
 * You can add some options starting with the character '$'. Options available are:
   * <code>$minRootTimeToTrackInMicros=<TIME IN microseconds></code>
 specifies the minimum time for the root tracker to match in order to log results from this method
-  * <code>minTimeToTrackInMicros=<TIME IN microseconds></code>
+  * <code>$minTimeToTrackInMicros=<TIME IN microseconds></code>
 specifies the minimum time to match for a subcall in order to log results from this method
   * <code>$trackParameters</code>
 specifies that parameters should be tracked
@@ -29,7 +29,7 @@ Config file example:
  // output file
   :/tmp/stats.json
  // options
- $minTimeToTrackInMs=5
+ $minRootTimeToTrackInMicros=200
  // classes and methods to track
  \+com.mypackage.\*
  \#com.mypackage.service.\*
