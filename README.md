@@ -25,20 +25,21 @@ specifies that configuration loading should output debug informaiton
   * For each of this configuration, you can start the line with the character '#' in order to specify that you want to track parameters for this entry. Example: <code>#com.test.Test.remove(int)</code> will track the method 'remove(int)' from class 'com.test.Test' and the parameter value from type 'int' will be tracked also
 
 Config file example:
-
+```
  // output file
- :/tmp/stats.json
+  :/tmp/stats.json
  // options
  $minTimeToTrackInMs=5
  // classes and methods to track
  \+com.mypackage.\*
  \#com.mypackage.service.\*
  \-com.mypackage.dao.MyDao.create\*()
+```
 
 Next steps
-* implements on GUI auto expand
-* implements on GUI search on name
-* implements on GUI search on time spent with expand 
-* implements output to http socket / implements GUI input socket listener
-* implement linking calls from differents thread
-* implemnts filtering
+* implements on GUI auto expand when selecting a root node
+* implements on GUI a field to search on name or on time spent
+* implements output to http socket, create a socket listener collector
+* make production of report asynchronous to minimize impact on performances
+* link calls from differents threads (propagate threadlocal or rely on an ID)
+* Maybe switch to a web interface to analyse results
