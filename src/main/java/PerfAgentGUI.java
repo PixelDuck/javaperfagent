@@ -1,9 +1,7 @@
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Cursor;
-import java.awt.Font;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
@@ -34,6 +32,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.WindowConstants;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.MutableTreeNode;
@@ -49,24 +48,79 @@ import net.sf.json.JSONObject;
  * @author olmartin
  */
 public class PerfAgentGUI extends JFrame implements ActionListener, MouseListener {
-
   public static final String OPEN = "open";
   private static final Object ROOT = new Object();
   public static final String SUBCALLS = "subcalls";
   public static final String LOCATION = "location";
   public static final String SIZE = "size";
   public static final String FILEPATH = "filepath";
-  private static final String RECENTE_FILE = "recent_file";
-  private final List<File> recentFiles;
+  private static final String RECENT_FILE = "recent_file";
+  private List<File> recentFiles;
   private DefaultTreeModel treeModel;
   private JTree tree;
   private String filePath = "&lt;none&gt;";
-  private final DefaultMutableTreeNode rootNode;
+  private DefaultMutableTreeNode rootNode;
   private JMenuItem recentFilesMenu;
   private JPopupMenu popupMenu;
 
   public PerfAgentGUI() {
     super("Java performance agent");
+
+    setResizable(true);
+    setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+    loadAndApplyPreferences();
+    fixLookAndFeel();
+    initiatWindowListener();
+
+    createPopupMenu();
+    createMenuBar();
+    createTree();
+
+    Container contentPane = getContentPane();
+    contentPane.setLayout(new BorderLayout());
+    getContentPane().add(new JScrollPane(tree));
+  }
+
+  private void createTree() {
+
+    rootNode = new DefaultMutableTreeNode(ROOT);
+    treeModel = new DefaultTreeModel(rootNode);
+    tree = new JTree(treeModel);
+    tree.setCellRenderer(new MyTreeCellRenderer());
+
+    tree.addMouseListener(this);
+  }
+
+  private void initiatWindowListener() {
+    addWindowListener(new WindowAdapter() {
+      @Override public void windowClosing(WindowEvent e) {
+        Preferences preferences = Preferences.userNodeForPackage(getClass());
+        preferences.put(LOCATION, getLocation().x + "," + getLocation().y);
+        preferences.put(SIZE, getWidth() + "," + getHeight());
+        for (int i = 1; i < 5; i++) {
+          if (i <= recentFiles.size()) {
+            preferences.put(RECENT_FILE + "_" + i, recentFiles.get(i - 1).getPath());
+          } else {
+            preferences.remove(RECENT_FILE + "_" + i);
+          }
+        }
+        System.out.println("pref saved");
+      }
+    });
+  }
+
+  private void fixLookAndFeel() {
+    System.setProperty("apple.laf.useScreenMenuBar", "true");
+    System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Java performance agent");
+    try {
+      UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void loadAndApplyPreferences() {
     Preferences preferences = Preferences.userNodeForPackage(getClass());
     String location = preferences.get(LOCATION, null);
     if(location != null) {
@@ -83,111 +137,6 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
 
     String[] size = preferences.get(SIZE, "800,600").split(",");
     setSize(Integer.parseInt(size[0]), Integer.parseInt(size[1]));
-    System.setProperty("apple.laf.useScreenMenuBar", "true");
-    System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Test");
-    try {
-      UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-    setResizable(true);
-    setDefaultCloseOperation(EXIT_ON_CLOSE);
-    addWindowListener(new WindowAdapter() {
-      @Override public void windowClosing(WindowEvent e) {
-        Preferences preferences = Preferences.userNodeForPackage(getClass());
-        preferences.put(LOCATION, getLocation().x + "," + getLocation().y);
-        preferences.put(SIZE, getWidth() + "," + getHeight());
-        for (int i = 1; i < 5; i++) {
-          if (i <= recentFiles.size()) {
-            preferences.put(RECENTE_FILE + "_" + i, recentFiles.get(i - 1).getPath());
-          } else {
-            preferences.remove(RECENTE_FILE + "_" + i);
-          }
-        }
-        System.out.println("pref saved");
-      }
-    });
-
-    createPopupMenu();
-
-    setJMenuBar(createMenu());
-    rootNode = new DefaultMutableTreeNode(ROOT);
-    treeModel = new DefaultTreeModel(rootNode);
-    tree = new JTree(treeModel);
-    tree.setCellRenderer(new TreeCellRenderer() {
-      @Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row,
-          boolean hasFocus) {
-        DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
-        if (node != rootNode) {
-          Measure m = (Measure) node.getUserObject();
-          JLabel jLabel = new JLabel(
-              "<html><body style='background-color:"+(selected? "#FFFFBB":"#FFFFFF")+"'>"
-                  + "[<font style='color:" + color(grade(m.duration)) + "'>" + m.duration + "ms</font>"
-                  + " - <font style=';color:" + color(grade(m.percentage, m.duration)) + "'>" + m.percentage + "</font>]"
-                  + "&nbsp;"
-                  + "<font style='color:" + methodcolor(m.duration) + "'>" + m.methodName + "</font>"
-                  + "</body></html>");
-          jLabel.setOpaque(true);
-          return jLabel;
-        } else {
-          return new JLabel("<html><font color='gray'>file " + filePath + "</font></html>");
-        }
-      }
-
-      private String color(int grade) {
-        switch(grade) {
-        case 5:
-          return "#FF0000";
-        case 4:
-          return "#FF9900";
-        case 3:
-          return "#FFCC00";
-        case 2:
-          return "#33CC00";
-        case 1:
-        default:
-          return "#C0C0C0";
-        }
-      }
-
-      private int grade(double duration) {
-        if(duration>1000d)
-          return 5;
-        if(duration>500d)
-          return 4;
-        if(duration>150d)
-          return 3;
-        if(duration>40d)
-          return 2;
-        return 1;
-      }
-
-      private int grade(double percent, double duration) {
-        if(percent>40d)
-          return Math.min(5, grade(duration));
-        if(percent>20d)
-          return Math.min(4, grade(duration));
-        if(percent>10d)
-          return Math.min(3, grade(duration));
-        if(percent>5d)
-          return Math.min(2, grade(duration));
-        return 1;
-      }
-
-      private String methodcolor(double duration) {
-        if(duration>1000d)
-          return "#FF0000";
-        if(duration>40d)
-          return "#000000";
-        return "#C0C0C0";
-      }
-    });
-
-    tree.addMouseListener(this);
-
-    Container contentPane = getContentPane();
-    contentPane.setLayout(new BorderLayout());
-    getContentPane().add(new JScrollPane(tree));
   }
 
   private void createPopupMenu() {
@@ -196,15 +145,14 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
       @Override public void actionPerformed(ActionEvent e) {
         TreePath[] selectionPaths = tree.getSelectionPaths();
         double duration = 0d;
-        double percentage = 0d;
-        for(TreePath treePath : selectionPaths) {
-          DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) treePath.getLastPathComponent();
-          Measure measure = (Measure) selectedNode.getUserObject();
-          duration += measure.duration;
-          percentage += measure.percentage;
+        if(selectionPaths != null) {
+          for (TreePath treePath : selectionPaths) {
+            DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) treePath.getLastPathComponent();
+            Measure measure = (Measure) selectedNode.getUserObject();
+            duration += measure.duration;
+          }
+          showInfo(duration + "ms", "Stats for selection");
         }
-        JOptionPane.showMessageDialog(PerfAgentGUI.this,
-            "["+duration+"ms  - "+percentage+"%]");
       }
     });
     popupMenu.add(new JMenuItem("Copy method name to clipboard")).addActionListener(new ActionListener() {
@@ -234,12 +182,14 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
           File selectedFile = f.getSelectedFile();
           if (selectedFile != null) {
             if(selectedFile.exists() && selectedFile.canWrite()) {
-              selectedFile.delete();
+              if(selectedFile.delete()) {
+                showAlert("Failed to delete "+selectedFile, "Error");
+                return ;
+              }
             }
             try (FileWriter fileWriter = new FileWriter(selectedFile)) {
               fileWriter.write("["+measure.toJson()+"]");
-              JOptionPane.showMessageDialog(PerfAgentGUI.this,
-                  "Stack saved to "+selectedFile);
+              showInfo("Stack saved to " + selectedFile, "");
             } catch (IOException e1) {
               e1.printStackTrace();
             }
@@ -247,6 +197,14 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
         }
       }
     });
+  }
+
+  private void showInfo(String message, String title) {
+    JOptionPane.showMessageDialog(this, message, title, JOptionPane.INFORMATION_MESSAGE);
+  }
+
+  private void showAlert(String message, String title) {
+    JOptionPane.showMessageDialog(this, message, title, JOptionPane.ERROR_MESSAGE);
   }
 
   @Override
@@ -290,7 +248,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
   private List<File> loadRecentFiles(Preferences preferences) {
     List<File> files = new ArrayList<>();
     for(int i=1; i<=5; i++){
-      String path = preferences.get(RECENTE_FILE + "_" + i, null);
+      String path = preferences.get(RECENT_FILE + "_" + i, null);
       if(path!=null) {
         File f =new File(path);
         if(f.exists() && f.canRead()) {
@@ -303,7 +261,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
     return files;
   }
 
-  private JMenuBar createMenu() {
+  private void createMenuBar() {
     JMenuBar menu = new JMenuBar();
     JMenu fileMenu = menu.add(new JMenu("File"));
     JMenuItem openMenu = fileMenu.add(new JMenuItem("Open..."));
@@ -315,7 +273,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
     } else {
       refreshRecentFileMenu();
     }
-    return menu;
+    setJMenuBar(menu);
   }
 
   public static void main(String[] args) {
@@ -504,6 +462,76 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
     root.removeAllChildren();
     if (updateUI) {
       refreshUI();
+    }
+  }
+
+  private class MyTreeCellRenderer implements TreeCellRenderer {
+    @Override
+    public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row,
+        boolean hasFocus) {
+      DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+      if (node != rootNode) {
+        Measure m = (Measure) node.getUserObject();
+        JLabel jLabel = new JLabel(
+            "<html><body style='background-color:"+(selected? "#FFFFBB":"#FFFFFF")+"'>"
+                + "[<font style='color:" + color(grade(m.duration)) + "'>" + m.duration + "ms</font>"
+                + " - <font style=';color:" + color(grade(m.percentage, m.duration)) + "'>" + m.percentage + "</font>]"
+                + "&nbsp;"
+                + "<font style='color:" + methodcolor(m.duration) + "'>" + m.methodName + "</font>"
+                + "</body></html>");
+        jLabel.setOpaque(true);
+        return jLabel;
+      } else {
+        return new JLabel("<html><font color='gray'>file " + filePath + "</font></html>");
+      }
+    }
+
+    private String color(int grade) {
+      switch(grade) {
+      case 5:
+        return "#FF0000";
+      case 4:
+        return "#FF9900";
+      case 3:
+        return "#FFCC00";
+      case 2:
+        return "#33CC00";
+      case 1:
+      default:
+        return "#C0C0C0";
+      }
+    }
+
+    private int grade(double duration) {
+      if(duration>1000d)
+        return 5;
+      if(duration>500d)
+        return 4;
+      if(duration>150d)
+        return 3;
+      if(duration>40d)
+        return 2;
+      return 1;
+    }
+
+    private int grade(double percent, double duration) {
+      if(percent>40d)
+        return Math.min(5, grade(duration));
+      if(percent>20d)
+        return Math.min(4, grade(duration));
+      if(percent>10d)
+        return Math.min(3, grade(duration));
+      if(percent>5d)
+        return Math.min(2, grade(duration));
+      return 1;
+    }
+
+    private String methodcolor(double duration) {
+      if(duration>1000d)
+        return "#FF0000";
+      if(duration>40d)
+        return "#000000";
+      return "#C0C0C0";
     }
   }
 }
