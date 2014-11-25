@@ -75,7 +75,9 @@ public class PerfAgentMonitor {
       deepTL.set(0);
       try {
         if (content != null) {
-          new FileWriter(outputFile, true).append(content).close();
+          synchronized (outputFile) {
+            new FileWriter(outputFile, true).append(content).close();
+          }
         } else {
           if (debug) {
             System.out.println("Content for " + trackInfo.methodName + " null");
@@ -90,7 +92,7 @@ public class PerfAgentMonitor {
   }
 
   private static String createJsonFromStack(List<TrackInfo> trackInfos) {
-    StringBuilder monitorsSb = new StringBuilder();
+    StringBuffer buffer = new StringBuffer();
     for (int i1 = 0; i1 < trackInfos.size(); i1++) {
       TrackInfo trackInfo = trackInfos.get(i1);
       TrackInfo nextTrackInfo = (i1 < trackInfos.size() - 1) ? trackInfos.get(i1 + 1) : null;
@@ -100,29 +102,29 @@ public class PerfAgentMonitor {
       boolean isNextCallSequentialCall = nextElementDeep==currentDeep;
       boolean isLastCall = nextTrackInfo==null;
       double totalTime = (double)trackInfo.durationInMicros/1000;
-      monitorsSb.append("\"").append(toMethodName(trackInfo.methodName, trackInfo.paramValues)).append("\":\"").append(totalTime).append("ms\"");
+      buffer.append("\"").append(toMethodName(trackInfo.methodName, trackInfo.paramValues)).append("\":\"").append(totalTime).append("ms\"");
       if (isLastCall) {
         for (int d = currentDeep; d > 1; d--) {
-          monitorsSb.append("}]");
+          buffer.append("}]");
         }
       } else {
         if (isNextCallSubCall) {
-          monitorsSb.append(",\"subcalls\":[{");
+          buffer.append(",\"subcalls\":[{");
         } else if (isNextCallSequentialCall) {
-          monitorsSb.append("},{");
+          buffer.append("},{");
         } else {
           for (int d = nextElementDeep; d < currentDeep; d++) {
-            monitorsSb.append("}]");
+            buffer.append("}]");
           }
-          monitorsSb.append("},{");
+          buffer.append("},{");
         }
       }
     }
-    if(monitorsSb.length()==0) {
+    if(buffer.length()==0) {
       return null;
     }
     else {
-      return "[{"+monitorsSb.toString()+"}]\n";
+      return "[{"+buffer.toString()+"}]\n";
     }
   }
 
@@ -143,8 +145,8 @@ public class PerfAgentMonitor {
       return sb.toString()
           .replace("'", "\'")
           .replace("\\", "\\\\")
-          .replace("\n", "\\\n")
-          .replace("\t", "\\\t")
+          .replace("\n", "")
+          .replace("\t", "")
           .replace("\"", "\\\"");
     }
   }

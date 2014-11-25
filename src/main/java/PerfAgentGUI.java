@@ -192,6 +192,21 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
 
   private void createPopupMenu() {
     popupMenu = new JPopupMenu();
+    popupMenu.add(new JMenuItem("Compute stats for selected rows...")).addActionListener(new ActionListener() {
+      @Override public void actionPerformed(ActionEvent e) {
+        TreePath[] selectionPaths = tree.getSelectionPaths();
+        double duration = 0d;
+        double percentage = 0d;
+        for(TreePath treePath : selectionPaths) {
+          DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) treePath.getLastPathComponent();
+          Measure measure = (Measure) selectedNode.getUserObject();
+          duration += measure.duration;
+          percentage += measure.percentage;
+        }
+        JOptionPane.showMessageDialog(PerfAgentGUI.this,
+            "["+duration+"ms  - "+percentage+"%]");
+      }
+    });
     popupMenu.add(new JMenuItem("Copy method name to clipboard")).addActionListener(new ActionListener() {
       @Override public void actionPerformed(ActionEvent e) {
         DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
@@ -236,10 +251,9 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
 
   @Override
   public void mouseClicked(MouseEvent e) {
-
     if (SwingUtilities.isRightMouseButton(e)) {
-      int row = tree.getClosestRowForLocation(e.getX(), e.getY());
-      tree.setSelectionRow(row);
+//      int row = tree.getClosestRowForLocation(e.getX(), e.getY());
+//      tree.setSelectionRow(row);
       popupMenu.show(e.getComponent(), e.getX(), e.getY());
     }
   }
