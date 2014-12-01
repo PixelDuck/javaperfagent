@@ -40,8 +40,10 @@ import javax.swing.tree.TreeCellRenderer;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
+import net.minidev.json.JSONArray;
+import net.minidev.json.JSONObject;
+import net.minidev.json.parser.JSONParser;
+import net.minidev.json.parser.ParseException;
 
 /**
  * User interface to see results from java agent.
@@ -356,7 +358,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
             root.add(loadCallTree(line));
           }
         } while (line != null);
-      } catch (IOException e) {
+      } catch (IOException | ParseException e) {
         e.printStackTrace();
         System.exit(8);
       } finally {
@@ -372,22 +374,24 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
 
   }
 
-  private MutableTreeNode loadCallTree(String json) {
-    JSONArray jsonArray = JSONArray.fromObject(json);
-    JSONObject jsonObject = jsonArray.getJSONObject(0);
+  private MutableTreeNode loadCallTree(String json) throws ParseException {
+    JSONParser p = new JSONParser(JSONParser.MODE_JSON_SIMPLE);
+    JSONArray jsonArray = (JSONArray)p.parse(json);
+//    JSONArray jsonArray = new JSONArray(json);
+    JSONObject jsonObject = (JSONObject) jsonArray.get(0);
     DefaultMutableTreeNode node = new DefaultMutableTreeNode();
 
     Set<String> keys = jsonObject.keySet();
     for (String key : keys)
       if (!key.equals(SUBCALLS)) {
-        String value = jsonObject.getString(key);
+        String value = (String) jsonObject.get(key);
         value = value.substring(0, value.length() - 2);
         double duration = Double.parseDouble(value);
         Measure userObject = new Measure(key, duration, duration, 100, jsonObject);
         node.setUserObject(userObject);
       }
     if (keys.contains(SUBCALLS)) {
-      addCallTreeSubElements(node, jsonObject.getJSONArray(SUBCALLS));
+      addCallTreeSubElements(node, (JSONArray) jsonObject.get(SUBCALLS));
     }
     return node;
   }
@@ -412,12 +416,12 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
   private void addCallTreeSubElements(DefaultMutableTreeNode parent, JSONArray children) {
     Measure parentUserObject = (Measure) parent.getUserObject();
     for (int i = 0, max = children.size(); i < max; i++) {
-      JSONObject jsonObject = children.getJSONObject(i);
+      JSONObject jsonObject = (JSONObject) children.get(i);
       DefaultMutableTreeNode node = new DefaultMutableTreeNode();
       Set<String> keys = jsonObject.keySet();
       for (String key : keys) {
         if (!key.equals(SUBCALLS)) {
-          String value = jsonObject.getString(key);
+          String value = (String) jsonObject.get(key);
           value = value.substring(0, value.length() - 2);
           double duration = Double.parseDouble(value);
           Measure userObject = new Measure(key, duration, parentUserObject.totalDuration,
@@ -430,7 +434,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
       }
       parent.add(node);
       if (keys.contains(SUBCALLS)) {
-        addCallTreeSubElements(node, jsonObject.getJSONArray(SUBCALLS));
+        addCallTreeSubElements(node, (JSONArray) jsonObject.get(SUBCALLS));
       }
     }
   }
