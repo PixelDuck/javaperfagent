@@ -295,6 +295,7 @@ public class PerfAgent implements ClassFileTransformer {
 
   public static void premain(String agentArgs, Instrumentation inst) {
     System.out.println("Activate perf agent");
+    System.setProperty("JavaPerfAgent", "enabled");
     if( agentArgs==null || agentArgs.trim().length()==0) {
       System.err.println("You must specify the path to configuration file for the agent.");
       System.exit(9);

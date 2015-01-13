@@ -92,7 +92,7 @@ public class PerfAgentMonitor {
   }
 
   private static String createJsonFromStack(List<TrackInfo> trackInfos) {
-    StringBuffer buffer = new StringBuffer();
+    StringBuilder buffer = new StringBuilder();
     for (int i1 = 0; i1 < trackInfos.size(); i1++) {
       TrackInfo trackInfo = trackInfos.get(i1);
       TrackInfo nextTrackInfo = (i1 < trackInfos.size() - 1) ? trackInfos.get(i1 + 1) : null;

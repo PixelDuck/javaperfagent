@@ -1,4 +1,5 @@
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Cursor;
@@ -89,6 +90,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
     rootNode = new DefaultMutableTreeNode(ROOT);
     treeModel = new DefaultTreeModel(rootNode);
     tree = new JTree(treeModel);
+    tree.setBackground(Color.white);
     tree.setCellRenderer(new MyTreeCellRenderer());
 
     tree.addMouseListener(this);
@@ -115,11 +117,6 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
   private void fixLookAndFeel() {
     System.setProperty("apple.laf.useScreenMenuBar", "true");
     System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Java performance agent");
-    try {
-      UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
   }
 
   private void loadAndApplyPreferences() {
@@ -484,6 +481,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
                 + "<font style='color:" + methodcolor(m.duration) + "'>" + m.methodName + "</font>"
                 + "</body></html>");
         jLabel.setOpaque(true);
+        jLabel.setBorder(null);
         return jLabel;
       } else {
         return new JLabel("<html><font color='gray'>file " + filePath + "</font></html>");
