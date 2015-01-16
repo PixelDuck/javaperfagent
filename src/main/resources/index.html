@@ -36,6 +36,8 @@
 			$.getJSON("file/"+path).done(function(data) {
         		var _tree = $('#resultsTree');
         		_tree.html('');
+        		$('#filedisplay').text('Results from '+path);
+        		loadRecentFiles();
         		$.each(data, function(id, row) {
 					var _tr = $('<tr>')
         					.addClass('root')
@@ -44,7 +46,7 @@
         					.append($('<td>').text(row.name))
         					.append(
         						$('<td>').text(row.duration).addClass(toSpeedColor(row.duration, row.duration))
-							)
+							);
 	       			_tree.append(_tr);
 					if (row.hasChild) {
 						_tr.click(function(event){
@@ -57,7 +59,7 @@
 							if ($(this).hasClass('expanded')) {
 								if (_subcalls) {
 									var loadingid = 'loading-'+id;
-									vat _loadingTr = $(this).after('<tr id="'+loadingid+'"><td colspan="4" style="padding-left: 20px;"><i class="icon-spin1 animate-spin" ></i><span>Loading...</span></td></tr>');
+									var _loadingTr = $(this).after('<tr id="'+loadingid+'"><td colspan="4" style="padding-left: 20px;"><i class="icon-spin1 animate-spin" ></i><span>Loading...</span></td></tr>');
 									expandTree($(this), loadingid);
 								} else {
 									_subcalls.show();
@@ -76,10 +78,41 @@
         }
 
         function expandTree(_parentTr, loadingid) {
-			var id = $(this).attr('id').substring('tr-'.length);
+			var id = _parentTr.attr('id').substring(3);
         	$.getJSON("file/current/line?lineNumber="+id).done(function(data) {
-        		_parentTr.remove('#'+loadingid);
-        		$(this).after('<tr id="subcalls-'+id+'"><td colspan="4">'+data+'</td></tr>');
+        		_parentTr.next().remove();
+        		_parentTr.after('<tr id="subcalls-'+id+'"><td colspan="4"><table id="subcalls-results-'+id+'"></table></td></tr>');
+        		_subtable = $('subcalls-results-'+id);
+        		$.each(data, function(id, row) {
+					var _tr = $('<tr>')
+        					.append($('<td>').text(row.name))
+        					.append(
+        						$('<td>').text(row.duration).addClass(toSpeedColor(row.duration, row.duration))
+							);
+	       			_subtable.append(_tr);
+					if (row.hasChild) {
+						_tr.click(function(event){
+							$(this).toggleClass('expanded');
+							var _icon = $(this).find('i');
+							_icon.toggleClass('icon-plus-squared-alt');
+							_icon.toggleClass('icon-minus-squared-alt');
+							var id = $(this).attr('id');
+							var _subcalls = $('#subcalls-'+id);
+							if ($(this).hasClass('expanded')) {
+								if (_subcalls) {
+									var loadingid = 'loading-'+id;
+									var _loadingTr = $(this).after('<tr id="'+loadingid+'"><td colspan="4" style="padding-left: 20px;"><i class="icon-spin1 animate-spin" ></i><span>Loading...</span></td></tr>');
+									expandTree($(this), loadingid);
+								} else {
+									_subcalls.show();
+								}
+							} else {
+								_subcalls.hide();
+							}
+						})
+					}
+
+        		});
 			});
         }
 
@@ -101,6 +134,12 @@
 			loadRecentFiles();
         	$("#openfile").click(function (){
 			   	show($('#filetoopen').val());
+			});
+			$( "#filetoopen" ).keypress(function( event ) {
+  				if ( event.which == 13 ) {
+     				event.preventDefault();
+     				show($('#filetoopen').val());
+  				}
 			});
 			$("#refresh").click(function (){
 				$.getJSON("file/current/path").done(function(data){
@@ -138,6 +177,7 @@
 				<i class="icon-spin1 animate-spin" ></i><span>Loading...</span>
 			</div>
 			<div id="results">
+				<h2 id="filedisplay">No file selected</h2>
 				<table id="resultsTree"></table>
 			</div>
 		</div>

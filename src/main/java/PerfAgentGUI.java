@@ -32,7 +32,6 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
@@ -48,7 +47,7 @@ import net.minidev.json.parser.ParseException;
 
 /**
  * User interface to see results from java agent.
- * @author olmartin
+ * @author olivier martin
  */
 public class PerfAgentGUI extends JFrame implements ActionListener, MouseListener {
   public static final String OPEN = "open";

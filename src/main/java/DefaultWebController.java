@@ -4,7 +4,6 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.prefs.Preferences;
 
 import org.apache.commons.io.IOUtils;
 import org.kevoree.library.nanohttp.NanoHTTPD;
@@ -12,7 +11,7 @@ import org.kevoree.library.nanohttp.NanoHTTPD;
 /**
  * A default web controller which returns file found in the resource folder.
  *
- * @author olmartin
+ * @author olivier martin
  */
 public class DefaultWebController extends NanoHTTPD {
 
@@ -24,7 +23,8 @@ public class DefaultWebController extends NanoHTTPD {
   public static final String MIME_SVG        = "image/svg";
   public static final String MIME_WOFF       = "application/font-woff";
   public static final String MIME_EOT        = "font/opentype";
-  public static final String MIME_TTF        = "pplication/octet-stream";
+  public static final String MIME_TTF        = "application/octet-stream";
+  public static final String MIME_MIN_MAP    = "application/json";
 
   private Map<String, String> cache      = new HashMap<>();
   private Map<String, byte[]> bytesCache = new HashMap<>();
@@ -58,6 +58,8 @@ public class DefaultWebController extends NanoHTTPD {
       return new NanoHTTPD.Response(HTTP_OK, MIME_EOT, bytes(url, false));
     } else if (url.endsWith(".ttf")) {
       return new NanoHTTPD.Response(HTTP_OK, MIME_TTF, bytes(url, false));
+    } else if (url.endsWith(".map")) {
+      return new NanoHTTPD.Response(HTTP_OK, MIME_MIN_MAP, bytes(url, false));
     }
     return new NanoHTTPD.Response(HTTP_BADREQUEST, MIME_PLAINTEXT, "Cant handle url "+uri);
   }

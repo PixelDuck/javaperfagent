@@ -23,23 +23,26 @@ import javassist.NotFoundException;
 
 /**
  * An agent to track performances. See {@link #printUsage()} for documentation.
+ *
+ * @author olivier martin
  */
 public class PerfAgent implements ClassFileTransformer {
 
+  public static final String DEFAULT_OUTPUTFILE_PATH = "/tmp/stats.json";
   private static boolean trackParameters = false;
-  private static boolean debugConfigFile = false;
-  private Map<String, Pair<Map<String,Boolean>, Boolean>> trackedClass = new HashMap<>();
-  private Map<String, Pair<Map<String,Boolean>, Boolean>> untrackedClass = new HashMap<>();
-  private Set<String> debugClasses = new HashSet<>();
+  private static boolean                                          debugConfigFile = false;
+  private        Map<String, Pair<Map<String, Boolean>, Boolean>> trackedClass    = new HashMap<>();
+  private        Map<String, Pair<Map<String, Boolean>, Boolean>> untrackedClass  = new HashMap<>();
+  private        Set<String>                                      debugClasses    = new HashSet<>();
 
-  public PerfAgent(String ... args) {
+  public PerfAgent(String... args) {
     config(args[0]);
   }
 
   public void config(String configFilePath) {
     BufferedReader reader = null;
     try {
-      if(new File(configFilePath).exists()) {
+      if (new File(configFilePath).exists()) {
         reader = new BufferedReader(new FileReader(configFilePath));
       } else {
         reader = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(configFilePath)));
@@ -48,7 +51,7 @@ public class PerfAgent implements ClassFileTransformer {
       do {
         line = reader.readLine();
         if (line != null) {
-          addConfig(line);
+          processConfig(line);
         }
       } while (line != null);
     } catch (IOException e) {
@@ -66,7 +69,7 @@ public class PerfAgent implements ClassFileTransformer {
     }
   }
 
-  private void addConfig(String line) {
+  private void processConfig(String line) {
     line = line.trim();
     if(!line.isEmpty() && !line.startsWith("//")) {
       if (line.startsWith("+")) {
@@ -103,10 +106,15 @@ public class PerfAgent implements ClassFileTransformer {
         if (appendFile) {
           filePath = filePath.substring(0, filePath.length() - 1);
         } else {
-          new File(filePath).delete();
+          if (!new File(filePath).delete()) {
+            System.err.println("Failed to delete file " + filePath);
+          }
         }
-        PerfAgentMonitor.outputFile(filePath);
+        PerfAgentMonitor.outputFilePath(filePath);
       }
+    }
+    if (PerfAgentMonitor.outputFilePath() == null) {
+      PerfAgentMonitor.outputFilePath(DEFAULT_OUTPUTFILE_PATH);
     }
   }
 
@@ -114,16 +122,19 @@ public class PerfAgent implements ClassFileTransformer {
     String[] split = option.split("=");
     switch(split[0]) {
       case "minTimeToTrackInMicros":
-        PerfAgentMonitor.minTimeToTrackInMicros = Long.parseLong(split[1]);
+        PerfAgentMonitor.minTimeToTrackInMicros(Long.parseLong(split[1]));
         break;
       case "minRootTimeToTrackInMicros":
-        PerfAgentMonitor.minRootTimeToTrackInMicros = Long.parseLong(split[1]);
+        PerfAgentMonitor.minRootTimeToTrackInMicros(Long.parseLong(split[1]));
         break;
       case "debugConfigFile":
         debugConfigFile = split.length==1 || "true".equalsIgnoreCase(split[1]);
         break;
       case "trackParameters":
         trackParameters = split.length==1 || "true".equalsIgnoreCase(split[1]);
+        break;
+      case "stopLoggingResultsOnLowDiskSpace":
+        PerfAgentMonitor.stopLoggingResultsOnLowDiskSpace(Long.parseLong(split[1]));
         break;
       }
   }
@@ -178,11 +189,11 @@ public class PerfAgent implements ClassFileTransformer {
 
   public boolean checkTrackParam(String methodName, String entryClassName) {
     Pair<Map<String, Boolean>, Boolean> map = trackedClass.get(entryClassName);
-    boolean trackParam = map.getRight().booleanValue();
+    boolean trackParam = map.getRight();
     Map<String, Boolean> methods = map.getLeft();
     Boolean aBoolean = methods.get(methodName);
     if(aBoolean!=null){
-      trackParam = aBoolean.booleanValue();
+      trackParam = aBoolean;
     } else {
       String keyFound = null;
       for (String entry : methods.keySet()) {
@@ -195,7 +206,7 @@ public class PerfAgent implements ClassFileTransformer {
       if (keyFound != null) {
         Boolean val = methods.get(keyFound);
         if (val != null)
-          return val.booleanValue();
+          return val;
       }
     }
     return trackParam;
@@ -294,14 +305,15 @@ public class PerfAgent implements ClassFileTransformer {
   }
 
   public static void premain(String agentArgs, Instrumentation inst) {
-    System.out.println("Activate perf agent");
-    System.setProperty("JavaPerfAgent", "enabled");
     if( agentArgs==null || agentArgs.trim().length()==0) {
       System.err.println("You must specify the path to configuration file for the agent.");
       System.exit(9);
     }
     String[] param = agentArgs.split(",");
-    System.out.println("Perf agent config file: "+param[0]);
+    System.out.println("JavaPerfAgent is activated");
+    System.out.println("JavaPerfAgent config file: " + param[0]);
+    System.setProperty("JavaPerfAgent.enabled", "true");
+    System.setProperty("JavaPerfAgent.configfile", param[0]);
     PerfAgent perfAgent = new PerfAgent(param);
     inst.addTransformer(perfAgent);
   }
@@ -326,6 +338,8 @@ public class PerfAgent implements ClassFileTransformer {
             + "\t  specifies that parameters should be tracked\n"
             + "\t$debugConfigFile\n"
             + "\t  debug configuration analysis\n"
+            + "\t$stopLoggingResultsOnLowDiskSpace=<SizeInMegabytes>\n"
+            + "\t  specifies the disk free space limit which will stop saving results on the FS\n"
             + "You should add some classes or methods to track with: \n"
             + "\t* A full class name (means package with class name) starting with '+'. for example:\n"
             + "\t\t+java.util.ArrayList\n"

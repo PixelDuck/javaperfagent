@@ -14,6 +14,8 @@ import org.kevoree.library.nanohttp.NanoHTTPD;
 
 /**
  * A web gui to analyse results.
+ *
+ * @author olivier martin
  */
 public class WebGUI extends DefaultWebController {
 

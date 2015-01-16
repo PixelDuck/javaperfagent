@@ -6,6 +6,8 @@ import org.kevoree.library.nanohttp.NanoHTTPD;
 
 /**
  * Class listening on socket to aggregate results locally.
+ *
+ * @author olivier martin
  */
 public class SocketAggregator extends NanoHTTPD {
 
