@@ -8,7 +8,7 @@
 */
 
 *{margin:0;padding:0}:focus,:active {outline:0}img{border: 0}
-body { font: .8em Arial, Tahoma, Verdana; background: #fff url(images/bg.gif) repeat-x; color: #777; }
+body { font: .8em Arial, Tahoma, Verdana; background: #fff ; color: #777; }
 a { text-decoration: none; color: #B20F0F; }
 a:hover { text-decoration: underline; }
 h1 { font-size: 1.4em; font-weight: normal; }
@@ -17,24 +17,39 @@ h2 { font-size: 1.2em; }
 h3 { font-size: 1.2em; background: #B00A0A ; padding: 6px 7px; color: #fff; font-weight: normal; margin: 0 0 15px; float: left; }
 h4 { margin: 0 0 15px; color: #555; font-weight: normal; font-size: 1.6em; font-weight: normal; }
 p { clear: both; line-height: 1.64em; margin: 0 0 15px; }
-.line { clear: both; border-bottom: 1px solid #ddd; margin: 0 0 45px; }
+.line { clear: both; margin: 0 0 45px; position:fixed;text-align: right;right:45px;top: 35px}
 .clear { clear: both; }
+
+#alltop { color: #ccc; padding: 6px 20px 0; font-size: .84em; text-align: right; background-color:#000; height:18px; width:100%; position:fixed}
 #content { width: 90%; margin: 0 auto; }
-	#top { color: #ccc; padding: 6px 20px 0; font-size: .84em; text-align: right; }
-	#logo { float: left; background-color: #3B8CCA; padding: 30px	15px 10px 10px; margin: -46px 0 20px; }
+	#top { color: #ccc; padding: 6px 20px 0; font-size: .84em; text-align: right; background-color:#000; height:18px; width:90%; position:fixed}
+	#logo { float: left; background-color: #3B8CCA; padding: 12px 15px 0px 15px; position:fixed; top:0px; height:35px; }
 		#logo h1 { color: #fff; text-shadow: 1px 1px 1px #2E68A8; }
 	#menu { float: right; margin: 63px 20px 0; }
 		#menu li { display: inline; font-size: 1.3em; }
 			#menu li a { float: left; color: #808080; padding: 0 0 5px; margin: 0 0 0 55px; }
 			#menu li a:hover, #menu li.current a, #menu li a:focus { color: #000; border-bottom: 1px solid #ddd; }
-	.left { float: left; width: 200px; }
-	.right { display: block; width: auto; margin: 0 0 20px; }
-		.right h3 { background: #808080; font-size: .84em; }
-	.third { float: left; width: 296px; margin: 0 40px 20px 0; }
+	.left { float: left; width: 200px; margin-top:50px; position:fixed}
+	.center { display: block; width: auto; padding-left: 220px; padding-top:50px}
+		.center h3 { background: #808080; font-size: .84em; }
+	.third { float: left; width: 296px; margin: 0 40px 20px 0; margin-left:200px}
 		.last { margin-right: 0; }
-	#footer { clear: both; font-size: .84em; border-top: 1px solid #ddd; padding: 20px 0 0; }
+
+@media only screen and (max-width: 2280px) {
+    .line {
+        display: none;
+    }
+}
+
+.no-icon {}
+
+.loading-subtree {padding-left: 20px;}
+
+#perficon {float:right;align:right;size:100px;}
 
 tr:hover {background-color: yellow;}
+.duration {width: 200px;display: inline-block;}
+.root > td > span.duration {background-color: #eee}
 
 .speed-veryslow {color: #F00;}
 .speed-slow {color: #F90;}

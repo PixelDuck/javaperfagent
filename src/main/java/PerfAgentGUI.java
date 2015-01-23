@@ -372,9 +372,7 @@ public class PerfAgentGUI extends JFrame implements ActionListener, MouseListene
 
   private MutableTreeNode loadCallTree(String json) throws ParseException {
     JSONParser p = new JSONParser(JSONParser.MODE_JSON_SIMPLE);
-    JSONArray jsonArray = (JSONArray)p.parse(json);
-//    JSONArray jsonArray = new JSONArray(json);
-    JSONObject jsonObject = (JSONObject) jsonArray.get(0);
+    JSONObject jsonObject = (JSONObject)p.parse(json);
     DefaultMutableTreeNode node = new DefaultMutableTreeNode();
 
     Set<String> keys = jsonObject.keySet();

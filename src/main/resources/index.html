@@ -1,187 +1,47 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head><!--[if lt IE 9]><script language="javascript" type="text/javascript" src="//html5shim.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<head><!--[if lt IE 9]><script language="javascript" type="text/javascript" src="//html5shim.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-	<link rel="stylesheet" type="text/css" href="css/screen.css" media="screen" />
+		<link rel="stylesheet" type="text/css" href="css/screen.css" media="screen" />
 
-	<script type="text/javascript" src="js/jquery-2.1.3.min.js"></script>
+		<script type="text/javascript" src="js/jquery-2.1.3.min.js"></script>
+		<script type="text/javascript" src="js/memoryanalyzer.js"></script>
 
-	<link rel="stylesheet" href="css/fontello.css">
-	<link rel="stylesheet" href="css/animation.css"><!--[if IE 7]><link rel="stylesheet" href="css/fontello-ie7.css"><![endif]-->
+		<link rel="stylesheet" href="css/fontello.css">
+		<link rel="stylesheet" href="css/animation.css"><!--[if IE 7]><link rel="stylesheet" href="css/fontello-ie7.css"><![endif]-->
 
-	<title>Java perf agent - Analyzer</title>
+		<title>Java perf agent - Analyzer</title>
 
-	<script type="text/javascript">
-        function loadRecentFiles() {
-			$.getJSON("files/recent").done(function( data ) {
-        		var _rf = $('#recentfiles');
-        		_rf.html('');
-				$.each( data, function(id, value) {
-					_a = $('<a>').attr('href', '#').text(value.path);
-					_a.click(function(){show(value.path);});
-					_rf.append(
-						$('<li>')
-							.attr('id', 'recentfile-'+id).attr('value', value.path)
-							.append(_a));
-				});
-				if (Object.keys(data).length==0)
-					_rf.html('none');
-        	});
-        }
+	</head>
+	<body>
+		<div id="alltop"></div>
 
-        function show(path) {
-        	$('#results').hide();
-        	$('#loading').show();
-			$.getJSON("file/"+path).done(function(data) {
-        		var _tree = $('#resultsTree');
-        		_tree.html('');
-        		$('#filedisplay').text('Results from '+path);
-        		loadRecentFiles();
-        		$.each(data, function(id, row) {
-					var _tr = $('<tr>')
-        					.addClass('root')
-        					.attr('id', 'tr-'+row.lineNumber)
-        					.append($('<td>').append($('<i>').addClass(row.hasChild ? 'icon-plus-squared-alt' : '')))
-        					.append($('<td>').text(row.name))
-        					.append(
-        						$('<td>').text(row.duration).addClass(toSpeedColor(row.duration, row.duration))
-							);
-	       			_tree.append(_tr);
-					if (row.hasChild) {
-						_tr.click(function(event){
-							$(this).toggleClass('expanded');
-							var _icon = $(this).find('i');
-							_icon.toggleClass('icon-plus-squared-alt');
-							_icon.toggleClass('icon-minus-squared-alt');
-							var id = $(this).attr('id');
-							var _subcalls = $('#subcalls-'+id);
-							if ($(this).hasClass('expanded')) {
-								if (_subcalls) {
-									var loadingid = 'loading-'+id;
-									var _loadingTr = $(this).after('<tr id="'+loadingid+'"><td colspan="4" style="padding-left: 20px;"><i class="icon-spin1 animate-spin" ></i><span>Loading...</span></td></tr>');
-									expandTree($(this), loadingid);
-								} else {
-									_subcalls.show();
-								}
-							} else {
-								_subcalls.hide();
-							}
-						})
-					}
-
-        		});
-        		$('#refresh').attr('disabled', false);
-        	});
-			$('#loading').hide();
-			$('#results').show();
-        }
-
-        function expandTree(_parentTr, loadingid) {
-			var id = _parentTr.attr('id').substring(3);
-        	$.getJSON("file/current/line?lineNumber="+id).done(function(data) {
-        		_parentTr.next().remove();
-        		_parentTr.after('<tr id="subcalls-'+id+'"><td colspan="4"><table id="subcalls-results-'+id+'"></table></td></tr>');
-        		_subtable = $('subcalls-results-'+id);
-        		$.each(data, function(id, row) {
-					var _tr = $('<tr>')
-        					.append($('<td>').text(row.name))
-        					.append(
-        						$('<td>').text(row.duration).addClass(toSpeedColor(row.duration, row.duration))
-							);
-	       			_subtable.append(_tr);
-					if (row.hasChild) {
-						_tr.click(function(event){
-							$(this).toggleClass('expanded');
-							var _icon = $(this).find('i');
-							_icon.toggleClass('icon-plus-squared-alt');
-							_icon.toggleClass('icon-minus-squared-alt');
-							var id = $(this).attr('id');
-							var _subcalls = $('#subcalls-'+id);
-							if ($(this).hasClass('expanded')) {
-								if (_subcalls) {
-									var loadingid = 'loading-'+id;
-									var _loadingTr = $(this).after('<tr id="'+loadingid+'"><td colspan="4" style="padding-left: 20px;"><i class="icon-spin1 animate-spin" ></i><span>Loading...</span></td></tr>');
-									expandTree($(this), loadingid);
-								} else {
-									_subcalls.show();
-								}
-							} else {
-								_subcalls.hide();
-							}
-						})
-					}
-
-        		});
-			});
-        }
-
-        function toSpeedColor(duration, parentDuration) {
-        	var d = duration.substring(0, duration.length-2);
-		  	if(d>1000)
-				return 'speed-veryslow';
-		  	if(d>500)
-				return 'speed-slow';
-		  	if(d>150)
-				return 'speed-medium';
-		  	if(d>40)
-				return 'speed-fast';
-		  	return 'speed-fastest';
-        }
-
-		$( document ).ready(function() {
-       		$('#refresh').attr('disabled', true);
-			loadRecentFiles();
-        	$("#openfile").click(function (){
-			   	show($('#filetoopen').val());
-			});
-			$( "#filetoopen" ).keypress(function( event ) {
-  				if ( event.which == 13 ) {
-     				event.preventDefault();
-     				show($('#filetoopen').val());
-  				}
-			});
-			$("#refresh").click(function (){
-				$.getJSON("file/current/path").done(function(data){
-			   		show(data.path);
-				});
-			 });
-			$("#shutdown").click(function (){
-				alert("shutdown");
-			   	$.ajax({url:"server/shutdown"}).done(function (){
-			   		alert("server shutdown");
-				});
-			});
-			$('#results').hide();
-        	$('#loading').hide();
-        });
-	</script>
-</head>
-<body>
-	<div id="content">
-		<p id="top"><i class="icon-chart-line" style="margin-right: 3px"></i>Java perf agent - Analyzer<i id="shutdown" class="icon-off" style="margin-left: 15px"></i></p>
-		<div id="logo">
-			<h1>Java perf agent</h1>
-		</div>
-		<div class="line"><img src="css/images/perf.png" alt="performance icon" style="float:right;align:right; size:100px"/></div>
-		<div class="left" style="vertical-align:top;">
-			<h2>Recent files:</h2>
-			<ul id="recentfiles" style="margin-bottom:15px; margin-left:15px"></ul>
-			<p><input id="filetoopen" type="text" data-tip="select file..."/><input type="button" value="open" id="openfile"/></p>
-			<h2>Actions</h2>
-			<p><input type="button" value="refresh" id="refresh"/></p>
-
-		</div>
-		<div class="right" style="vertical-align:top;">
-			<div id="loading" style="width:100%">
-				<i class="icon-spin1 animate-spin" ></i><span>Loading...</span>
+		<div id="content">
+			<div id="top"><i class="icon-chart-line" style="margin-right: 3px"></i>Java perf agent - Analyzer<i id="shutdown" class="icon-off" style="margin-left: 15px"></i></div>
+			<div id="logo">
+				<h1>Java perf agent</h1>
 			</div>
-			<div id="results">
-				<h2 id="filedisplay">No file selected</h2>
-				<table id="resultsTree"></table>
+			<div class="line"><img src="css/images/perf.png" id="perficon" alt="performance icon"/></div>
+			<div class="left" style="vertical-align:top;">
+				<h2>Recent files:</h2>
+				<ul id="recentfiles" style="margin-bottom:15px; margin-left:15px"></ul>
+				<p><input id="filetoopen" type="text" title="select file..."/><input type="button" value="open" id="openfile"/></p>
+				<p><label for="rootthreshold">Min time for Root (in ms)</label><input id="rootthreshold" type="text" value="1"/></p>
+				<p><label for="threshold">Min time for subcall (in ms)</label><input id="threshold" type="text" value="1"/></p>
+				<h2>Actions</h2>
+				<p><input type="button" value="refresh" id="refresh"/></p>
+
+			</div>
+			<div class="center" style="vertical-align:top;">
+				<div id="loading" style="width:100%">
+					<i class="icon-spin1 animate-spin" ></i><span>Loading...</span>
+				</div>
+				<div id="results">
+					<h2 id="filedisplay">No file selected</h2>
+					<table id="resultsTree"></table>
+				</div>
 			</div>
 		</div>
-		<div id="footer">Copyright 2015</div>
-	</div>
-</body>
+	</body>
 </html>

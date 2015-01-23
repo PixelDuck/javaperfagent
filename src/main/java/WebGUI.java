@@ -51,7 +51,7 @@ public class WebGUI extends DefaultWebController {
       }
       return new NanoHTTPD.Response(HTTP_BADREQUEST, MIME_PLAINTEXT, "No file already loaded");
     } else if (url.equals("file/current/line")) {
-      return new NanoHTTPD.Response(HTTP_OK, MIME_JSON, readLine(new File(currentFilePath), Integer.valueOf(params.getProperty("lineNumber"))));
+      return new NanoHTTPD.Response(HTTP_OK, MIME_JSON, readLine(Integer.valueOf(params.getProperty("lineNumber"))));
     } else if (url.startsWith("file/")) {
       String filePath = url.substring("file/".length());
       return loadFileAndReturnItAsJson(filePath);
@@ -84,13 +84,21 @@ public class WebGUI extends DefaultWebController {
     return buffer.toString();
   }
 
-  private String readLine(File file, int lineNumber) {
+  private String readLine(int lineNumber) {
+    if (supportShellCommand()) {
+      return lineContentWithShellCommand(lineNumber);
+    } else {
+      return lineContentWithJava(lineNumber);
+    }
+  }
+
+  private String lineContentWithJava(int lineNumber) {
     int count = 0;
     FileInputStream fileInputStream = null;
     Scanner sc = null;
     String line = null;
     try {
-      fileInputStream = new FileInputStream(file);
+      fileInputStream = new FileInputStream(new File(currentFilePath));
       sc = new Scanner(fileInputStream, "UTF-8");
       while (sc.hasNextLine() && count!=lineNumber) {
         line = sc.nextLine();
@@ -120,20 +128,28 @@ public class WebGUI extends DefaultWebController {
 
   private String readFirstContentAsJSON(File file) {
     int count = 0;
+    int nbLines = -1;
+    if (supportShellCommand()) {
+      nbLines = nbLinesWithShellCommand(file);
+    }
     FileInputStream fileInputStream = null;
     Scanner sc = null;
     StringBuilder buffer = new StringBuilder("[");
     try {
       fileInputStream = new FileInputStream(file);
       sc = new Scanner(fileInputStream, "UTF-8");
-      int max = 100;
+//      int max = 100;
       while (sc.hasNextLine()) {
         String line = sc.nextLine();
         count++;
-        if(count>max) break;
+//        if(count>max) break;
         if (buffer.length()>1)
           buffer.append(",");
-        System.out.print("\rRead line " + count);
+        if (nbLines >= 0) {
+          System.out.print("\rRead line " + count+ " / "+nbLines);
+        } else {
+          System.out.print("\rRead line " + count);
+        }
         if (line != null) {
           String rootCall;
           if (line.contains(SUBCALLS)) {
@@ -154,6 +170,7 @@ public class WebGUI extends DefaultWebController {
           }
         }
       }
+      System.out.println("\nFile is read!");
     } catch(Exception e) {
       e.printStackTrace();
     } finally {
@@ -170,6 +187,60 @@ public class WebGUI extends DefaultWebController {
     }
     buffer.append("]");
     return buffer.toString();
+  }
+
+  private boolean supportShellCommand() {
+    return System.getProperty("os.name").startsWith("Mac OS")
+        || System.getProperty("os.name").startsWith("Linux");
+  }
+
+  private int nbLinesWithShellCommand(File file) {
+    String output = runShellCommand("cat \"" + file.getAbsolutePath() + "\" | wc -l");
+    if (output != null) {
+      return  Integer.parseInt(output);
+    }
+    return -1;
+  }
+
+  private String runShellCommand(String command) {
+    InputStream commndOutput = null;
+    Process cmd;
+    try {
+      cmd = Runtime.getRuntime().exec(new String[] {"/bin/sh", "-c", command});
+      commndOutput = cmd.getInputStream();
+    } catch (IOException e) {
+      e.printStackTrace();
+      return null;
+    }
+    try {
+      try (Scanner sc = new Scanner(commndOutput, "utf-8")) {
+        sc.useDelimiter("\\A");
+        if (sc.hasNextLine())
+          return sc.nextLine().trim();
+        else {
+          try (Scanner sc2 = new Scanner(cmd.getErrorStream(), "utf-8")) {
+            sc2.useDelimiter("\\A");
+            if (sc2.hasNextLine())
+              System.out.println("Error :" + sc2.nextLine());
+            else {
+              System.out.println("No line returned by command");
+            }
+          }
+          System.out.println("No line returned by command");
+        }
+      }
+    } finally {
+      try {
+        commndOutput.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+    return null;
+  }
+
+  private String lineContentWithShellCommand(int lineNumber) {
+    return runShellCommand("sed -n '"+lineNumber+"p' "+currentFilePath);
   }
 
   public static void main(String[] args) {
