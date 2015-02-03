@@ -246,7 +246,9 @@ public class WebGUI extends DefaultWebController {
   public static void main(String[] args) {
     try {
       new WebGUI();
-//      showGUI();
+      if (args.length == 0 || !"-no-auto-open".equals(args[0])) {
+        showGUI();
+      }
       while (true) {
         try {
           Thread.sleep(100);
