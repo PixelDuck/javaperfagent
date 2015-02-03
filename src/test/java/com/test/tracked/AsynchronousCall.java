@@ -1,6 +1,6 @@
 package com.test.tracked;
 
-import com.test.nottracked.Test;
+import com.test.nottracked.NotTrackedCalled;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -11,21 +11,17 @@ import java.util.concurrent.TimeoutException;
 /**
  * Created by olmartin on 2014-11-05.
  */
-public class Bar {
+public class AsynchronousCall {
 
   private final ExecutorService executorService;
-  Test test = new Test();
+  NotTrackedCalled test = new NotTrackedCalled();
 
-  public Bar() {
+  public AsynchronousCall() {
     executorService = Executors.newFixedThreadPool(1);
   }
 
-  public String bar(String who) throws InterruptedException, ExecutionException, TimeoutException {
-    test.foo();
-    return callFuture(who);
-  }
-
   public String callFuture(String who) throws InterruptedException, ExecutionException, TimeoutException {
+    System.out.println("callFuture from "+getClass().getName());
     return executorService.submit(new ACallable(who)).get(1000L, TimeUnit.MILLISECONDS);
 
   }
